@@ -184,8 +184,8 @@ class UserPinger(object):
         for user in users:
             try:
                 self.reddit.redditor(user).message(
-                    subject=f"{group} Ping",
-                    message=f"[You've been pinged by /u/{comment.author}]({comment.permalink})"
+                    subject=f"You've been pinged by /u/{comment.author} in group {group}",
+                    message=str(comment.permalink)
                 )
             except praw.exceptions.APIException:
                 self.logger.debug("%s could not be found, skipping", user)
