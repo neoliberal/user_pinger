@@ -20,7 +20,7 @@ def main() -> None:
 
     bot: UserPinger = UserPinger(
         reddit,
-        "neoliberal"
+        os.environ["userpinger_subreddit"]
     )
 
     while True:
