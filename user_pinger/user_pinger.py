@@ -123,6 +123,7 @@ class UserPinger(object):
                 self.logger.debug("End of comment with no group specified")
                 return
             else:
+                self.logger.debug("Found group is %s", trigger)
                 self.handle_ping(trigger.upper(), comment)
 
     def handle_ping(self, group: str, comment: praw.models.Comment) -> None:
