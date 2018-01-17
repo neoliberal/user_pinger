@@ -188,7 +188,7 @@ class UserPinger(object):
                     message=f"[You've been pinged]({comment.permalink})"
                 )
             except praw.exceptions.APIException:
-                self.logger.debug("User could not be found, skipping")
+                self.logger.debug("%s could not be found, skipping", user)
         self.logger.debug("Pinged individual users")
 
         self.logger.debug("Posting comment")
