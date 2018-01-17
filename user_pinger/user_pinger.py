@@ -182,10 +182,13 @@ class UserPinger(object):
 
         self.logger.debug("Pinging individual users")
         for user in users:
-            self.reddit.redditor(user).message(
-                subject=f"{group} Ping",
-                message=f"[You've been pinged]({comment.permalink})"
-            )
+            try:
+                self.reddit.redditor(user).message(
+                    subject=f"{group} Ping",
+                    message=f"[You've been pinged]({comment.permalink})"
+                )
+            except praw.exceptions.APIException:
+                self.logger.debug("User could not be found, skipping")
         self.logger.debug("Pinged individual users")
 
         self.logger.debug("Posting comment")
