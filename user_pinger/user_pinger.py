@@ -73,7 +73,7 @@ class UserPinger(object):
         self.logger.debug("Getting groups")
         import prawcore
         try:
-            groups.read_string(self.subreddit.wiki["userpinger/groups"])
+            groups.read_string(self.subreddit.wiki["userpinger/groups"].content_md)
         except prawcore.exceptions.NotFound:
             self.logger.error("Could not find groups")
             return groups
