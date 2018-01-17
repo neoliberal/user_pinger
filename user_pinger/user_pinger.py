@@ -148,8 +148,8 @@ class UserPinger(object):
         if author.lower() not in users:
             self.logger.warning("Non-member %s tried to ping \"%s\" group", author, group)
             self.send_error_pm([
-                "You cannot ping a group you are not a member of",
-                "If you would like to be added to this group please contact the moderators"
+                f"You need to be a member of {group} to ping it",
+                "If you would like to be added, please contact the moderators"
             ], comment)
             return
         self.logger.debug("Checked that author is in group")
@@ -174,8 +174,8 @@ class UserPinger(object):
             """posts reply indicating ping was successful"""
             users_list: str = ", ".join([f"/u/{user}" for user in users])
             body: str = "\n\n".join([
-                f"Pinging members of {group} Group",
-                users_list,
+                f"^(Pinged members of {group} Group)",
+                f"^({users_list})",
                 "^(Contact Moderators to join this group)"
             ])
             comment.reply(body)
@@ -185,7 +185,7 @@ class UserPinger(object):
             try:
                 self.reddit.redditor(user).message(
                     subject=f"{group} Ping",
-                    message=f"[You've been pinged]({comment.permalink})"
+                    message=f"[You've been pinged by /u/{comment.author}]({comment.permalink})"
                 )
             except praw.exceptions.APIException:
                 self.logger.debug("%s could not be found, skipping", user)
