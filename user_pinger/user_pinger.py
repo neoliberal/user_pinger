@@ -153,7 +153,7 @@ class UserPinger(object):
             return
         self.logger.debug("Checked that author is in group")
 
-        self.ping_users(group, comment, users)
+        self.ping_users(group, users, comment)
         return
 
     def send_error_pm(self, errors: List[str], comment: praw.models.Comment) -> None:
