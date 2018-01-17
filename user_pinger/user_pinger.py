@@ -161,7 +161,10 @@ class UserPinger(object):
         self.logger.debug("Sending error PM to %s", comment.author)
         errors.append(
             "If you believe this is a mistake, please contact the moderators")
-        comment.author.message("\n\n".join(errors))
+        comment.author.message(
+            subject="Ping Error",
+            message="\n\n".join(errors)
+        )
         return
 
     def ping_users(self, group: str, users: List[str], comment: praw.models.Comment) -> None:
