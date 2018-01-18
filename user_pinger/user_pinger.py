@@ -186,7 +186,7 @@ class UserPinger(object):
 
         self.logger.debug("Pinging individual users")
         for user in users:
-            if user == str(comment.author):
+            if user.lower() == str(comment.author).lower():
                 continue
             try:
                 self.reddit.redditor(user).message(
