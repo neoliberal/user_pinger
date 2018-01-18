@@ -69,6 +69,7 @@ class UserPinger(object):
     def get_groups(self) -> ConfigParser:
         """gets current groups"""
         groups: ConfigParser = ConfigParser(allow_no_value=True)
+        groups.optionxform = lambda option: option # preserve capitalization
 
         self.logger.debug("Getting groups")
         import prawcore
@@ -145,7 +146,7 @@ class UserPinger(object):
         self.logger.debug("Got users in group")
 
         self.logger.debug("Checking if author is in group")
-        if author.lower() not in users:
+        if author.lower() not in [user.lower() for user in users]:
             self.logger.warning("Non-member %s tried to ping \"%s\" group", author, group)
             self.send_error_pm([
                 f"You need to be a member of {group} to ping it",
