@@ -109,11 +109,11 @@ class UserPinger(object):
         """handles ping"""
         self.logger.debug("Handling comment \"%s\"", str(comment))
         split: List[str] = comment.body.lower().split()
-        self.parsed.append(str(comment))
         try:
             index: int = split.index("!ping")
         except ValueError:
             self.logger.debug("No trigger in comment")
+            self.parsed.append(str(comment))
             return
         else:
             self.logger.debug("Ping found")
@@ -196,4 +196,5 @@ class UserPinger(object):
         self.logger.debug("Posted comment")
 
         self.logger.debug("Pinging group \"%s\"")
+        self.parsed.append(str(comment))
         return
