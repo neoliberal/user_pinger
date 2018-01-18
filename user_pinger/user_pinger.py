@@ -77,10 +77,13 @@ class UserPinger(object):
             groups.read_string(self.subreddit.wiki["userpinger/groups"].content_md)
         except prawcore.exceptions.NotFound:
             self.logger.error("Could not find groups")
-            return groups
+            raise
         except ParsingError:
             self.logger.exception("Malformed file, could not parse")
-            return groups
+            raise
+        except prawcore.exceptions.PrawcoreException:
+            self.logger.exception("Unknown exception caught")
+            raise
         self.logger.debug("Successfully got groups")
         return groups
 
