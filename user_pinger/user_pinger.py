@@ -186,6 +186,8 @@ class UserPinger(object):
 
         self.logger.debug("Pinging individual users")
         for user in users:
+            if user == str(comment.author):
+                continue
             try:
                 self.reddit.redditor(user).message(
                     subject=f"You've been pinged by /u/{comment.author} in group {group}",
