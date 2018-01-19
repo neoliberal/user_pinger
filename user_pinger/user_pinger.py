@@ -176,10 +176,7 @@ class UserPinger(object):
         """pings users"""
         def post_comment() -> praw.models.Comment:
             """posts reply indicating ping was successful"""
-            body: str = "\n\n".join([
-                f"^(Pinging members of {group} Group...)",
-            ])
-            return comment.reply(body)
+            return comment.reply(f"^(Pinging members of {group} Group...)")
 
         def edit_comment(posted: praw.models.Comment) -> None:
             """edits comment to reflect all users pinged"""
