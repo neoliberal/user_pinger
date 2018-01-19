@@ -174,15 +174,28 @@ class UserPinger(object):
 
     def ping_users(self, group: str, users: List[str], comment: praw.models.Comment) -> None:
         """pings users"""
-        def post_comment() -> None:
+        def post_comment() -> praw.models.Comment:
             """posts reply indicating ping was successful"""
+            body: str = "\n\n".join([
+                f"^(Pinging members of {group} Group...)",
+            ])
+            return comment.reply(body)
+
+        def edit_comment(posted: praw.models.Comment) -> None:
+            """edits comment to reflect all users pinged"""
             users_list: str = ", ".join([f"/u/{user}" for user in users])
             body: str = "\n\n".join([
                 f"^(Pinged members of {group} Group)",
                 f"^({users_list})",
                 "^(Contact Moderators to join this group)"
             ])
-            comment.reply(body)
+            posted.edit(body)
+
+        self.logger.debug("Pinging group")
+
+        self.logger.debug("Posting comment")
+        posted_comment: praw.models.Comment = post_comment()
+        self.logger.debug("Posted comment")
 
         self.logger.debug("Pinging individual users")
         for user in users:
@@ -197,9 +210,9 @@ class UserPinger(object):
                 self.logger.debug("%s could not be found, skipping", user)
         self.logger.debug("Pinged individual users")
 
-        self.logger.debug("Posting comment")
-        post_comment()
-        self.logger.debug("Posted comment")
+        self.logger.debug("Editing comment")
+        edit_comment(posted_comment)
+        self.logger.debug("Edited comment")
 
-        self.logger.debug("Pinging group \"%s\"")
+        self.logger.debug("Pinged group \"%s\"")
         return
