@@ -100,7 +100,7 @@ class UserPinger(object):
                 self.handle(comment)
 
             from praw.models.util import stream_generator
-            for comment in stream_generator(self.subreddit.edited(), pause_after=5):
+            for comment in stream_generator(self.subreddit.mod.edited(), pause_after=5):
                 try:
                     self.parsed.remove(str(comment))
                 except ValueError:
