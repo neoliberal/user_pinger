@@ -146,8 +146,10 @@ class UserPinger(object):
             return
         self.logger.debug("Got users in group")
 
+        mods: List[str] = self.groups.options("MODS")
+
         self.logger.debug("Checking if author is in group")
-        if str(comment.author).lower() not in [user.lower() for user in users]:
+        if (str(comment.author).lower() not in [user.lower() for user in users]) and (str(comment.author).lower() not in [user.lower() for user in mods]):
             self.logger.warning("Non-member %s tried to ping \"%s\" group", comment.author, group)
             self.send_error_pm([
                 f"You need to be a member of {group} to ping it",
