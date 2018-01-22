@@ -142,7 +142,7 @@ class UserPinger(object):
             users: List[str] = self.groups.options(group)
         except NoSectionError:
             self.logger.warning("Group \"%s\" by %s does not exist", group, author)
-            self.send_error_pm(["You pinged a group that does not exist"], comment)
+            self.send_error_pm([f"You pinged group {group} that does not exist"], author)
             return
         self.logger.debug("Got users in group")
 
@@ -152,19 +152,19 @@ class UserPinger(object):
             self.send_error_pm([
                 f"You need to be a member of {group} to ping it",
                 "If you would like to be added, please contact the moderators"
-            ], comment)
+            ], author)
             return
         self.logger.debug("Checked that author is in group")
 
         self.ping_users(group, users, comment)
         return
 
-    def send_error_pm(self, errors: List[str], comment: praw.models.Comment) -> None:
+    def send_error_pm(self, errors: List[str], author: praw.models.Redditor) -> None:
         """sends error PM"""
-        self.logger.debug("Sending error PM to %s", comment.author)
+        self.logger.debug("Sending error PM to %s", author)
         errors.append(
             "If you believe this is a mistake, please contact the moderators")
-        comment.author.message(
+        author.message(
             subject="Ping Error",
             message="\n\n".join(errors)
         )
