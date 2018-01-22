@@ -110,10 +110,10 @@ class UserPinger(object):
 
     def handle(self, comment: praw.models.Comment) -> None:
         """handles ping"""
-        split: List[str] = comment.body.lower().split()
+        split: List[str] = comment.body.upper().split()
         self.parsed.append(str(comment))
         try:
-            index: int = split.index("!ping")
+            index: int = split.index("!PING")
         except ValueError:
             # no trigger
             return
@@ -126,7 +126,7 @@ class UserPinger(object):
                 return
             else:
                 self.logger.debug("Found group is %s", trigger)
-                self.handle_ping(trigger.upper(), comment)
+                self.handle_ping(trigger, comment)
 
     def handle_ping(self, group: str, comment: praw.models.Comment) -> None:
         """handles ping"""
