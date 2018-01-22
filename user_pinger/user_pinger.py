@@ -98,20 +98,6 @@ class UserPinger(object):
                 if str(comment) in self.parsed:
                     continue
                 self.handle(comment)
-
-            from praw.models.util import stream_generator
-            for comment in stream_generator(self.subreddit.mod.edited, pause_after=1):
-                if comment is None:
-                    break
-                if isinstance(comment, praw.models.Submission):
-                    continue
-                try:
-                    self.parsed.remove(str(comment))
-                except ValueError:
-                    # not found, weird but just skip it
-                    pass
-                self.logger.debug("Found edited comment, reparsing")
-                self.handle(comment)
         except prawcore.exceptions.ServerError:
             self.logger.error("Server error: Sleeping for 1 minute.")
             sleep(60)
