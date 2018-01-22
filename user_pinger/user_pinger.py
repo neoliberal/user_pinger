@@ -148,23 +148,22 @@ class UserPinger(object):
         self.groups = self.get_groups()
         self.logger.debug("Updated groups")
 
-        author: str = str(comment.author)
         self.logger.debug("Getting users in group")
         try:
             users: List[str] = self.groups.options(group)
         except NoSectionError:
-            self.logger.warning("Group \"%s\" by %s does not exist", group, author)
-            self.send_error_pm([f"You pinged group {group} that does not exist"], author)
+            self.logger.warning("Group \"%s\" by %s does not exist", group, comment.author)
+            self.send_error_pm([f"You pinged group {group} that does not exist"], comment.author)
             return
         self.logger.debug("Got users in group")
 
         self.logger.debug("Checking if author is in group")
-        if author.lower() not in [user.lower() for user in users]:
-            self.logger.warning("Non-member %s tried to ping \"%s\" group", author, group)
+        if str(comment.author).lower() not in [user.lower() for user in users]:
+            self.logger.warning("Non-member %s tried to ping \"%s\" group", comment.author, group)
             self.send_error_pm([
                 f"You need to be a member of {group} to ping it",
                 "If you would like to be added, please contact the moderators"
-            ], author)
+            ], comment.author)
             return
         self.logger.debug("Checked that author is in group")
 
