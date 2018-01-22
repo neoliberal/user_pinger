@@ -101,7 +101,7 @@ class UserPinger(object):
 
             from praw.models.util import stream_generator
             for comment in stream_generator(self.subreddit.mod.edited, pause_after=1):
-                if comment is None:
+                if comment is None or isinstance(comment, praw.models.Submission):
                     break
                 try:
                     self.parsed.remove(str(comment))
