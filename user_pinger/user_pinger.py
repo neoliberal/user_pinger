@@ -96,7 +96,6 @@ class UserPinger(object):
                 if comment is None:
                     break
                 if str(comment) in self.parsed:
-                    self.logger.debug('"%s" already parsed, skipping', str(comment))
                     continue
                 self.handle(comment)
         except prawcore.exceptions.ServerError:
@@ -111,16 +110,15 @@ class UserPinger(object):
 
     def handle(self, comment: praw.models.Comment) -> None:
         """handles ping"""
-        self.logger.debug("Handling comment \"%s\"", str(comment))
         split: List[str] = comment.body.lower().split()
         self.parsed.append(str(comment))
         try:
             index: int = split.index("!ping")
         except ValueError:
-            self.logger.debug("No trigger in comment")
+            # no trigger
             return
         else:
-            self.logger.debug("Ping found")
+            self.logger.debug("Ping found in %s", str(comment))
             try:
                 trigger: str = split[index + 1]
             except IndexError:
