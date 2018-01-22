@@ -105,6 +105,7 @@ class UserPinger(object):
                     self.parsed.remove(str(comment))
                 except ValueError:
                     pass
+                self.logger.debug("Found edited comment, reparsing")
                 self.handle(comment)
         except prawcore.exceptions.ServerError:
             self.logger.error("Server error: Sleeping for 1 minute.")
