@@ -92,7 +92,7 @@ class UserPinger(object):
         import prawcore
         from time import sleep
         try:
-            for comment in self.subreddit.stream.comments(pause_after=5):
+            for comment in self.subreddit.stream.comments(pause_after=1):
                 if comment is None:
                     break
                 if str(comment) in self.parsed:
@@ -100,7 +100,9 @@ class UserPinger(object):
                 self.handle(comment)
 
             from praw.models.util import stream_generator
-            for comment in stream_generator(self.subreddit.mod.edited(), pause_after=5):
+            for comment in stream_generator(self.subreddit.mod.edited, pause_after=1):
+                if comment is None:
+                    break
                 try:
                     self.parsed.remove(str(comment))
                 except ValueError:
