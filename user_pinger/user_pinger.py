@@ -98,6 +98,14 @@ class UserPinger(object):
                 if str(comment) in self.parsed:
                     continue
                 self.handle(comment)
+
+            from praw.models.util import stream_generator
+            for comment in stream_generator(self.subreddit.edited(), pause_after=5):
+                try:
+                    self.parsed.remove(str(comment))
+                except ValueError:
+                    pass
+                self.handle(comment)
         except prawcore.exceptions.ServerError:
             self.logger.error("Server error: Sleeping for 1 minute.")
             sleep(60)
@@ -107,14 +115,6 @@ class UserPinger(object):
         except prawcore.exceptions.RequestException:
             self.logger.error("Request error: Sleeping for 1 minute.")
             sleep(60)
-
-        from praw.models.util import stream_generator
-        for comment in stream_generator(self.subreddit.edited(), pause_after=5):
-            try:
-                self.parsed.remove(str(comment))
-            except ValueError:
-                pass
-            self.handle(comment)
 
     def handle(self, comment: praw.models.Comment) -> None:
         """handles ping"""
