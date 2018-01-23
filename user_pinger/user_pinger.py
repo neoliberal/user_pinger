@@ -3,7 +3,7 @@ from configparser import ConfigParser, ParsingError, NoSectionError
 import pickle
 import logging
 import signal
-from typing import Deque, List
+from typing import Deque, List, Optional
 
 import praw
 from slack_python_logging import slack_logger
@@ -66,12 +66,12 @@ class UserPinger(object):
             return
         return
 
-    def get_wiki_page(self, page: str) -> ConfigParser:
+    def get_wiki_page(self, page: Optional[str]) -> ConfigParser:
         """gets current groups"""
         groups: ConfigParser = ConfigParser(allow_no_value=True)
         groups.optionxform = lambda option: option # preserve capitalization
 
-        combined_page: str = '/'.join(["userpinger", page])
+        combined_page: str = '/'.join(filter(None, ["userpinger", page]))
         self.logger.debug("Getting wiki page \"%s\"", combined_page)
         import prawcore
         try:
