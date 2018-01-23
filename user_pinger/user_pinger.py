@@ -66,7 +66,7 @@ class UserPinger(object):
             return
         return
 
-    def get_wiki_page(self, page: Optional[str]) -> ConfigParser:
+    def get_wiki_page(self, page: Optional[str] = None) -> ConfigParser:
         """gets current groups"""
         groups: ConfigParser = ConfigParser(allow_no_value=True)
         groups.optionxform = lambda option: option # preserve capitalization
