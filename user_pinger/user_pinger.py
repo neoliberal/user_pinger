@@ -10,7 +10,7 @@ from slack_python_logging import slack_logger
 
 class UserPinger(object):
     """pings users"""
-    __slots__ = ["reddit", "subreddit", "config", "logger", "parsed", "groups"]
+    __slots__ = ["reddit", "subreddit", "config", "logger", "parsed"]
 
     def __init__(self, reddit: praw.Reddit, subreddit: str) -> None:
         """initialize"""
@@ -24,7 +24,6 @@ class UserPinger(object):
         self.subreddit: praw.models.Subreddit = self.reddit.subreddit(subreddit)
         self.config: ConfigParser = self.get_wiki_page("config")
         self.parsed: Deque[str] = self.load()
-        self.groups: ConfigParser = self.get_wiki_page("groups")
         register_signals()
         self.logger.info("Successfully initialized")
 
@@ -144,12 +143,12 @@ class UserPinger(object):
         self.logger.debug("Handling ping")
 
         self.logger.debug("Updating groups")
-        self.groups = self.get_wiki_page("groups")
+        groups: ConfigParser = self.get_wiki_page("groups")
         self.logger.debug("Updated groups")
 
         self.logger.debug("Getting users in group")
         try:
-            users: List[str] = self.groups.options(group)
+            users: List[str] = groups.options(group)
         except NoSectionError:
             self.logger.warning("Group \"%s\" by %s does not exist", group, comment.author)
             self.send_error_pm([f"You pinged group {group} that does not exist"], comment.author)
