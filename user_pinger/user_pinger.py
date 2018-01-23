@@ -10,7 +10,7 @@ from slack_python_logging import slack_logger
 
 class UserPinger(object):
     """pings users"""
-    __slots__ = ["reddit", "subreddit", "logger", "parsed", "groups"]
+    __slots__ = ["reddit", "subreddit", "config", "logger", "parsed", "groups"]
 
     def __init__(self, reddit: praw.Reddit, subreddit: str) -> None:
         """initialize"""
@@ -22,8 +22,9 @@ class UserPinger(object):
         self.logger.debug("Initializing")
         self.reddit: praw.Reddit = reddit
         self.subreddit: praw.models.Subreddit = self.reddit.subreddit(subreddit)
+        self.config: ConfigParser = self.get_wiki_page("config")
         self.parsed: Deque[str] = self.load()
-        self.groups: ConfigParser = self.get_groups()
+        self.groups: ConfigParser = self.get_wiki_page("groups")
         register_signals()
         self.logger.info("Successfully initialized")
 
@@ -66,15 +67,16 @@ class UserPinger(object):
             return
         return
 
-    def get_groups(self) -> ConfigParser:
+    def get_wiki_page(self, page: str) -> ConfigParser:
         """gets current groups"""
         groups: ConfigParser = ConfigParser(allow_no_value=True)
         groups.optionxform = lambda option: option # preserve capitalization
 
-        self.logger.debug("Getting groups")
+        combined_page: str = '/'.join(["userpinger", page])
+        self.logger.debug("Getting wiki page \"%s\"", combined_page)
         import prawcore
         try:
-            groups.read_string(self.subreddit.wiki["userpinger/groups"].content_md)
+            groups.read_string(self.subreddit.wiki[combined_page].content_md)
         except prawcore.exceptions.NotFound:
             self.logger.error("Could not find groups")
             raise
@@ -131,10 +133,18 @@ class UserPinger(object):
 
     def handle_ping(self, group: str, comment: praw.models.Comment) -> None:
         """handles ping"""
+        def in_group(author: str, users: List[str]) -> bool:
+            """checks if author belongs to group"""
+            return author.lower() in [user.lower() for user in users]
+
+        def public_group(group: str) -> bool:
+            """checks if group is public, and can be pinged by anyone"""
+            return group.lower() in self.config.options("public")
+
         self.logger.debug("Handling ping")
 
         self.logger.debug("Updating groups")
-        self.groups = self.get_groups()
+        self.groups = self.get_wiki_page("groups")
         self.logger.debug("Updated groups")
 
         self.logger.debug("Getting users in group")
@@ -146,10 +156,8 @@ class UserPinger(object):
             return
         self.logger.debug("Got users in group")
 
-        mods: List[str] = self.groups.options("MODS")
-
-        self.logger.debug("Checking if author is in group")
-        if (str(comment.author).lower() not in [user.lower() for user in users]) and (str(comment.author).lower() not in [user.lower() for user in mods]):
+        self.logger.debug("Checking if author is in group or group is public")
+        if not (in_group(comment.author, users) or public_group(group)):
             self.logger.warning("Non-member %s tried to ping \"%s\" group", comment.author, group)
             self.send_error_pm([
                 f"You need to be a member of {group} to ping it",
