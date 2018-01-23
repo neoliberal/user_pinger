@@ -160,7 +160,7 @@ class UserPinger(object):
         self.logger.debug("Got users in group")
 
         self.logger.debug("Checking if author is in group or group is public")
-        if not (in_group(comment.author, users) or public_group(group)):
+        if not (in_group(str(comment.author), users) or public_group(group)):
             self.logger.warning("Non-member %s tried to ping \"%s\" group", comment.author, group)
             self.send_error_pm([
                 f"You need to be a member of {group} to ping it",
