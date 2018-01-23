@@ -4,10 +4,10 @@ After=multi-user.target
 
 [Service]
 Type=simple
-EnvironmentFile=/var/lib/rent_seeker/rent_seeker/data/variables.env
+EnvironmentFile=/var/lib/user_pinger/user_pinger/data/variables.env
 ExecStart=/usr/bin/python3.6 /var/lib/user_pinger/user_pinger/service.py
 User=root
-WorkingDirectory=/var/lib/rent_seeker/rent_seeker
+WorkingDirectory=/var/lib/user_pinger/user_pinger
 Restart=no
 
 [Install]
