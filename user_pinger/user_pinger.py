@@ -175,8 +175,7 @@ class UserPinger(object):
     def send_error_pm(self, errors: List[str], author: praw.models.Redditor) -> None:
         """sends error PM"""
         self.logger.debug("Sending error PM to %s", author)
-        errors.append(
-            "If you believe this is a mistake, please contact the moderators")
+        errors.append("If you believe this is a mistake, please contact the moderators")
         author.message(
             subject="Ping Error",
             message="\n\n".join(errors)
