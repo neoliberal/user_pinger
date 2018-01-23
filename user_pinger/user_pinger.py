@@ -142,6 +142,10 @@ class UserPinger(object):
 
         self.logger.debug("Handling ping")
 
+        self.logger.debug("Updating config")
+        self.config = self.get_wiki_page("config")
+        self.logger.debug("Updated config")
+
         self.logger.debug("Updating groups")
         groups: ConfigParser = self.get_wiki_page("groups")
         self.logger.debug("Updated groups")
