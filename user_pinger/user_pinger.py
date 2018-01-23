@@ -132,13 +132,17 @@ class UserPinger(object):
 
     def handle_ping(self, group: str, comment: praw.models.Comment) -> None:
         """handles ping"""
-        def in_group(author: str, users: List[str]) -> bool:
+        def in_group(author: praw.models.Redditor, users: List[str]) -> bool:
             """checks if author belongs to group"""
-            return author.lower() in [user.lower() for user in users]
+            return str(author).lower() in [user.lower() for user in users]
 
         def public_group(group: str) -> bool:
             """checks if group is public, and can be pinged by anyone"""
             return group.lower() in self.config.options("public")
+
+        def is_moderator(author: praw.models.Subreddit) -> bool:
+            """checks if author is a moderator"""
+            return author in self.subreddit.moderator()
 
         self.logger.debug("Handling ping")
 
@@ -160,7 +164,7 @@ class UserPinger(object):
         self.logger.debug("Got users in group")
 
         self.logger.debug("Checking if author is in group or group is public")
-        if not (in_group(str(comment.author), users) or public_group(group)):
+        if not (in_group(comment.author, users) or public_group(group) or is_moderator(comment.author)):
             self.logger.warning("Non-member %s tried to ping \"%s\" group", comment.author, group)
             self.send_error_pm([
                 f"You need to be a member of {group} to ping it",
