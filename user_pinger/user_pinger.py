@@ -196,7 +196,7 @@ class UserPinger(object):
             """edits comment to reflect all users pinged"""
             users_list: str = ", ".join([f"/u/{user}" for user in users])
             body: str = "\n\n".join([
-                f"^(Pinged members of {group} group.)",
+                f"^(Pinged members of {group} group:)",
                 f"^({users_list})",
                 "^(Contact the moderators to join this group.)"
             ])
