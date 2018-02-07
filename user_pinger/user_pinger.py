@@ -8,12 +8,14 @@ from typing import Deque, List, Optional
 import praw
 from slack_python_logging import slack_logger
 
+
 class UserPinger(object):
     """pings users"""
     __slots__ = ["reddit", "subreddit", "config", "logger", "parsed"]
 
     def __init__(self, reddit: praw.Reddit, subreddit: str) -> None:
         """initialize"""
+
         def register_signals() -> None:
             """registers signals"""
             signal.signal(signal.SIGTERM, self.exit)
@@ -21,7 +23,8 @@ class UserPinger(object):
         self.logger: logging.Logger = slack_logger.initialize("user_pinger")
         self.logger.debug("Initializing")
         self.reddit: praw.Reddit = reddit
-        self.subreddit: praw.models.Subreddit = self.reddit.subreddit(subreddit)
+        self.subreddit: praw.models.Subreddit = self.reddit.subreddit(
+            subreddit)
         self.config: ConfigParser = self.get_wiki_page("config")
         self.parsed: Deque[str] = self.load()
         register_signals()
@@ -46,7 +49,8 @@ class UserPinger(object):
                     self.logger.debug("Loaded pickle file")
                     self.logger.debug("Current Size: %s", len(parsed))
                     if parsed.maxlen != 10000:
-                        self.logger.warning("Deque length is not 10000, returning new one")
+                        self.logger.warning(
+                            "Deque length is not 10000, returning new one")
                         return Deque(parsed, maxlen=10000)
                     self.logger.debug("Maximum Size: %s", parsed.maxlen)
                     return parsed
@@ -132,6 +136,7 @@ class UserPinger(object):
 
     def handle_ping(self, group: str, comment: praw.models.Comment) -> None:
         """handles ping"""
+
         def in_group(author: praw.models.Redditor, users: List[str]) -> bool:
             """checks if author belongs to group"""
             return str(author).lower() in [user.lower() for user in users]
@@ -158,14 +163,19 @@ class UserPinger(object):
         try:
             users: List[str] = groups.options(group)
         except NoSectionError:
-            self.logger.warning("Group \"%s\" by %s does not exist", group, comment.author)
-            self.send_error_pm([f"You pinged group {group} that does not exist"], comment.author)
+            self.logger.warning("Group \"%s\" by %s does not exist", group,
+                                comment.author)
+            self.send_error_pm(
+                [f"You pinged group {group} that does not exist"],
+                comment.author)
             return
         self.logger.debug("Got users in group")
 
         self.logger.debug("Checking if author is in group or group is public")
-        if not (in_group(comment.author, users) or public_group(group) or is_moderator(comment.author)):
-            self.logger.warning("Non-member %s tried to ping \"%s\" group", comment.author, group)
+        if not (in_group(comment.author, users) or public_group(group)
+                or is_moderator(comment.author)):
+            self.logger.warning("Non-member %s tried to ping \"%s\" group",
+                                comment.author, group)
             self.send_error_pm([
                 f"You need to be a member of {group} to ping it",
                 "If you would like to be added, please contact the moderators"
@@ -176,18 +186,19 @@ class UserPinger(object):
         self.ping_users(group, users, comment)
         return
 
-    def send_error_pm(self, errors: List[str], author: praw.models.Redditor) -> None:
+    def send_error_pm(self, errors: List[str],
+                      author: praw.models.Redditor) -> None:
         """sends error PM"""
         self.logger.debug("Sending error PM to %s", author)
-        errors.append("If you believe this is a mistake, please contact the moderators")
-        author.message(
-            subject="Ping Error",
-            message="\n\n".join(errors)
-        )
+        errors.append(
+            "If you believe this is a mistake, please contact the moderators")
+        author.message(subject="Ping Error", message="\n\n".join(errors))
         return
 
-    def ping_users(self, group: str, users: List[str], comment: praw.models.Comment) -> None:
+    def ping_users(self, group: str, users: List[str],
+                   comment: praw.models.Comment) -> None:
         """pings users"""
+
         def post_comment() -> praw.models.Comment:
             """posts reply indicating ping was successful"""
             return comment.reply(f"^(Pinging members of {group} Group...)")
@@ -196,11 +207,20 @@ class UserPinger(object):
             """edits comment to reflect all users pinged"""
             users_list: str = ", ".join([f"/u/{user}" for user in users])
             body: str = "\n\n".join([
-                f"^(Pinged members of {group} Group)",
-                f"^({users_list})",
-                "^(Contact Moderators to join this group)"
+                f"Pinged members of {group} Group",
+                f"{users_list}",
+                "---",
+                make_footer()
             ])
             posted.edit(body)
+
+        def make_footer() -> str:
+            """"make footer for comment"""
+            return (
+                "^([user_pinger](https://github.com/neoliberal/user_pinger) |"
+                f"[Contact Moderators](https://reddit.com/message/compose?to=/r/{str(self.subreddit)}&subject=Group%20Request&message={group})"
+                "to join this group)"
+            )
 
         self.logger.debug("Pinging group")
 
@@ -214,9 +234,9 @@ class UserPinger(object):
                 continue
             try:
                 self.reddit.redditor(user).message(
-                    subject=f"You've been pinged by /u/{comment.author} in group {group}",
-                    message=str(comment.permalink)
-                )
+                    subject=
+                    f"You've been pinged by /u/{comment.author} in group {group}",
+                    message=str(comment.permalink))
             except praw.exceptions.APIException:
                 self.logger.debug("%s could not be found, skipping", user)
         self.logger.debug("Pinged individual users")
