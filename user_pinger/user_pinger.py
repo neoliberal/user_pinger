@@ -217,9 +217,9 @@ class UserPinger(object):
         def make_footer() -> str:
             """"make footer for comment"""
             return (
-                "^([user_pinger](https://github.com/neoliberal/user_pinger) |"
+                "[user_pinger](https://github.com/neoliberal/user_pinger) |"
                 f"[Contact the moderators](https://reddit.com/message/compose?to=/r/{str(self.subreddit)}&subject=Group%20Request&message={group})"
-                "to join this group)"
+                "to join this group"
             )
 
         self.logger.debug("Pinging group")
