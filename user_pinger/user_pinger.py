@@ -201,13 +201,13 @@ class UserPinger(object):
 
         def post_comment() -> praw.models.Comment:
             """posts reply indicating ping was successful"""
-            return comment.reply(f"^(Pinging members of {group} Group...)")
+            return comment.reply(f"^(Pinging members of {group} group...)")
 
         def edit_comment(posted: praw.models.Comment) -> None:
             """edits comment to reflect all users pinged"""
             users_list: str = ", ".join([f"/u/{user}" for user in users])
             body: str = "\n\n".join([
-                f"Pinged members of {group} Group",
+                f"Pinged members of {group} group:",
                 f"{users_list}",
                 "---",
                 make_footer()
