@@ -218,7 +218,7 @@ class UserPinger(object):
             """"make footer for comment"""
             return (
                 "^([user_pinger](https://github.com/neoliberal/user_pinger) |"
-                f"[Contact Moderators](https://reddit.com/message/compose?to=/r/{str(self.subreddit)}&subject=Group%20Request&message={group})"
+                f"[Contact the moderators](https://reddit.com/message/compose?to=/r/{str(self.subreddit)}&subject=Group%20Request&message={group})"
                 "to join this group)"
             )
 
