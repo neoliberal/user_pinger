@@ -73,7 +73,7 @@ class UserPinger(object):
     def get_wiki_page(self, page: Optional[str] = None) -> ConfigParser:
         """gets current groups"""
         groups: ConfigParser = ConfigParser(allow_no_value=True)
-        groups.optionxform = lambda option: option # preserve capitalization
+        groups.optionxform = lambda option: option # type: ignore
 
         combined_page: str = '/'.join(filter(None, ["userpinger", page]))
         self.logger.debug("Getting wiki page \"%s\"", combined_page)
@@ -83,7 +83,7 @@ class UserPinger(object):
         except prawcore.exceptions.NotFound:
             self.logger.error("Could not find groups")
             raise
-        except ParsingError:
+        except ParsingError: # type: ignore
             self.logger.exception("Malformed file, could not parse")
             raise
         except prawcore.exceptions.PrawcoreException:
