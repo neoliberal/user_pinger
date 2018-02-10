@@ -93,6 +93,7 @@ class UserPinger(object):
         return groups
 
     def update_wiki_page(self, page: str, groups: ConfigParser) -> None:
+        """updates wiki page with new groups"""
         import io
         stream: io.StringIO = io.StringIO()
         groups.write(stream)
@@ -266,24 +267,42 @@ class UserPinger(object):
         return
 
     def add_to_group(self, message: praw.models.Message) -> None:
+        """adds member to group"""
+
+        def protected_group(group: str) -> bool:
+            """check if group is protected and can only be added to by moderators"""
+            return group.lower() in self.config.options("protected")
+
         self.logger.debug("Handling addgroup request")
 
         self.logger.debug("Getting groups")
         groups: ConfigParser = self.get_wiki_page("groups")
         self.logger.debug("Got groups")
 
-        self.logger.debug("Adding member to group")
-        try:
-            groups.set(message.request, str(message.author), None)
-        except NoSectionError:
+        self.logger.debug("Checking if request exists")
+        if self.get_group_members(message.body, groups) is None:
             self.logger.warning(
                 f"Add group request {message.body} by {message.author} is invalid"
             )
             self.send_error_pm(
                 ["Your add group request {message.body} is invalid"],
                 message.author)
-        else:
-            self.logger.debug("Added member to group")
+        self.logger.debug("Added member to group")
+
+        self.logger.debug("Checking if group is protected")
+        if protected_group(message.body):
+            self.logger.warning(
+                "%s tried to add themselves to protected group \"%s\"",
+                message.author, message.body)
+            self.send_error_pm([
+                f"You attempted to add yourself to protected group {message.body}.",
+                "Contact moderators to be added."
+            ], message.author)
+
+        self.logger.debug("Adding %s to group \"%s\"", message.author,
+                          message.body)
+        groups.set(message.request, str(message.author), None)
+        self.logger.debug("Added successfully")
 
         self.update_wiki_page("groups", groups)
         return
