@@ -239,7 +239,7 @@ class UserPinger(object):
             """"make footer for comment"""
             return (
                 "[user_pinger](https://github.com/neoliberal/user_pinger) | "
-                f"[Contact the moderators](https://reddit.com/message/compose?to=/r/{str(self.reddit.user.me())}&subject=addgroup&message={group})"
+                f"[Request](https://reddit.com/message/compose?to={str(self.reddit.user.me())}&subject=addgroup&message={group})"
                 " to join this group")
 
         self.logger.debug("Pinging group")
@@ -304,6 +304,9 @@ class UserPinger(object):
         self.logger.debug("Adding %s to group \"%s\"", message.author,
                           message.body)
         groups.set(message.body, str(message.author), None)
+        message.author.message(
+            subject="Added to group",
+            message=f"You've been added to group {message.body}")
         self.logger.debug("Added successfully")
 
         self.update_wiki_page("groups", groups)
