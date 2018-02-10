@@ -95,10 +95,12 @@ class UserPinger(object):
     def update_wiki_page(self, page: str, groups: ConfigParser) -> None:
         """updates wiki page with new groups"""
         import io
+        self.logger.debug("Updating wiki page")
         stream: io.StringIO = io.StringIO()
         groups.write(stream)
         self.subreddit.wiki[f"userpinger/{page}"].edit(stream.getvalue())
         stream.close()
+        self.logger.debug("Updated wiki page")
         return
 
     def listen(self) -> None:
