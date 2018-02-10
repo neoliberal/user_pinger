@@ -301,7 +301,7 @@ class UserPinger(object):
 
         self.logger.debug("Adding %s to group \"%s\"", message.author,
                           message.body)
-        groups.set(message.request, str(message.author), None)
+        groups.set(message.body, str(message.author), None)
         self.logger.debug("Added successfully")
 
         self.update_wiki_page("groups", groups)
