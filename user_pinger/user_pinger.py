@@ -206,7 +206,7 @@ class UserPinger(object):
         def edit_comment(posted: praw.models.Comment) -> None:
             """edits comment to reflect all users pinged"""
             body: str = "\n\n".join([
-                f"Pinged members of {group} group:",
+                f"Pinged members of {group} group.",
                 "---",
                 make_footer()
             ])
