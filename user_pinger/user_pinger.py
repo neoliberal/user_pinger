@@ -73,7 +73,7 @@ class UserPinger(object):
     def get_wiki_page(self, page: Optional[str] = None) -> ConfigParser:
         """gets current groups"""
         groups: ConfigParser = ConfigParser(allow_no_value=True)
-        groups.optionxform = lambda option: option # type: ignore
+        groups.optionxform = lambda option: option  # type: ignore
 
         combined_page: str = '/'.join(filter(None, ["userpinger", page]))
         self.logger.debug("Getting wiki page \"%s\"", combined_page)
@@ -83,7 +83,7 @@ class UserPinger(object):
         except prawcore.exceptions.NotFound:
             self.logger.error("Could not find groups")
             raise
-        except ParsingError: # type: ignore
+        except ParsingError:  # type: ignore
             self.logger.exception("Malformed file, could not parse")
             raise
         except prawcore.exceptions.PrawcoreException:
@@ -91,6 +91,14 @@ class UserPinger(object):
             raise
         self.logger.debug("Successfully got groups")
         return groups
+
+    def update_wiki_page(self, page: str, groups: ConfigParser) -> None:
+        import io
+        stream: io.StringIO = io.StringIO()
+        groups.write(stream)
+        self.subreddit.wiki[f"userpinger/{page}"].edit(stream.getvalue())
+        stream.close()
+        return
 
     def listen(self) -> None:
         """lists to subreddit's comments for pings"""
@@ -103,6 +111,12 @@ class UserPinger(object):
                 if str(comment) in self.parsed:
                     continue
                 self.handle(comment)
+            for message in self.reddit.inbox.unread(limit=1):
+                if isinstance(
+                        message,
+                        praw.models.Message) and message.subject == "addgroup":
+                    self.add_to_group(message)
+                    message.mark_read()
         except prawcore.exceptions.ServerError:
             self.logger.error("Server error: Sleeping for 1 minute.")
             sleep(60)
@@ -112,6 +126,15 @@ class UserPinger(object):
         except prawcore.exceptions.RequestException:
             self.logger.error("Request error: Sleeping for 1 minute.")
             sleep(60)
+
+    def get_group_members(self, request: str,
+                          groups: ConfigParser) -> Optional[List[str]]:
+        try:
+            users: List[str] = groups.options(request)
+        except NoSectionError:
+            return None
+        else:
+            return users
 
     def handle(self, comment: praw.models.Comment) -> None:
         """handles ping"""
@@ -155,14 +178,13 @@ class UserPinger(object):
         self.config = self.get_wiki_page("config")
         self.logger.debug("Updated config")
 
-        self.logger.debug("Updating groups")
+        self.logger.debug("Getting groups")
         groups: ConfigParser = self.get_wiki_page("groups")
-        self.logger.debug("Updated groups")
+        self.logger.debug("Got groups")
 
         self.logger.debug("Getting users in group")
-        try:
-            users: List[str] = groups.options(group)
-        except NoSectionError:
+        users: Optional[List[str]] = self.get_group_members(group, groups)
+        if users is None:
             self.logger.warning("Group \"%s\" by %s does not exist", group,
                                 comment.author)
             self.send_error_pm(
@@ -205,20 +227,17 @@ class UserPinger(object):
 
         def edit_comment(posted: praw.models.Comment) -> None:
             """edits comment to reflect all users pinged"""
-            body: str = "\n\n".join([
-                f"Pinged members of {group} group.",
-                "---",
-                make_footer()
-            ])
+            body: str = "\n\n".join(
+                [f"Pinged members of {group} group.", "---",
+                 make_footer()])
             posted.edit(body)
 
         def make_footer() -> str:
             """"make footer for comment"""
             return (
                 "[user_pinger](https://github.com/neoliberal/user_pinger) | "
-                f"[Contact the moderators](https://reddit.com/message/compose?to=/r/{str(self.subreddit)}&subject=Group%20Request&message={group})"
-                " to join this group"
-            )
+                f"[Contact the moderators](https://reddit.com/message/compose?to=/r/{str(self.reddit.user.me())}&subject=addgroup&message={group})"
+                " to join this group")
 
         self.logger.debug("Pinging group")
 
@@ -244,4 +263,27 @@ class UserPinger(object):
         self.logger.debug("Edited comment")
 
         self.logger.debug("Pinged group \"%s\"")
+        return
+
+    def add_to_group(self, message: praw.models.Message) -> None:
+        self.logger.debug("Handling addgroup request")
+
+        self.logger.debug("Getting groups")
+        groups: ConfigParser = self.get_wiki_page("groups")
+        self.logger.debug("Got groups")
+
+        self.logger.debug("Adding member to group")
+        try:
+            groups.set(message.request, str(message.author), None)
+        except NoSectionError:
+            self.logger.warning(
+                f"Add group request {message.body} by {message.author} is invalid"
+            )
+            self.send_error_pm(
+                ["Your add group request {message.body} is invalid"],
+                message.author)
+        else:
+            self.logger.debug("Added member to group")
+
+        self.update_wiki_page("groups", groups)
         return
