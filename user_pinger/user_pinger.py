@@ -258,14 +258,14 @@ class UserPinger(object):
                     f"You've been pinged by /u/{comment.author} in group {group}",
                     message=str(comment.permalink))
             except praw.exceptions.APIException:
-                self.logger.debug("%s could not be found, skipping", user)
+                self.logger.debug("%s could not be found in group %s, skipping", user, group)
         self.logger.debug("Pinged individual users")
 
         self.logger.debug("Editing comment")
         edit_comment(posted_comment)
         self.logger.debug("Edited comment")
 
-        self.logger.debug("Pinged group \"%s\"")
+        self.logger.debug("Pinged group \"%s\"", group)
         return
 
     def add_to_group(self, message: praw.models.Message) -> None:
