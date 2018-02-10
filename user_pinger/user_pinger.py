@@ -289,6 +289,7 @@ class UserPinger(object):
             self.send_error_pm(
                 ["Your add group request {message.body} is invalid"],
                 message.author)
+            return
         self.logger.debug("Added member to group")
 
         self.logger.debug("Checking if group is protected")
