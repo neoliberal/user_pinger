@@ -256,7 +256,7 @@ class UserPinger(object):
                 self.reddit.redditor(user).message(
                     subject=
                     f"You've been pinged by /u/{comment.author} in group {group}",
-                    message=str(comment.permalink))
+                    message=f"[Click here to view the comment](https://www.reddit.com{str(comment.permalink)}?context=1000)")
             except praw.exceptions.APIException:
                 self.logger.debug("%s could not be found in group %s, skipping", user, group)
         self.logger.debug("Pinged individual users")
