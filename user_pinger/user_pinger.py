@@ -92,13 +92,13 @@ class UserPinger(object):
         self.logger.debug("Successfully got groups")
         return groups
 
-    def update_wiki_page(self, page: str, groups: ConfigParser) -> None:
+    def update_wiki_page(self, page: str, groups: ConfigParser, message: str) -> None:
         """updates wiki page with new groups"""
         import io
         self.logger.debug("Updating wiki page")
         stream: io.StringIO = io.StringIO()
         groups.write(stream)
-        self.subreddit.wiki[f"userpinger/{page}"].edit(stream.getvalue())
+        self.subreddit.wiki[f"userpinger/{page}"].edit(stream.getvalue(), reason=message)
         stream.close()
         self.logger.debug("Updated wiki page")
         return
@@ -301,6 +301,7 @@ class UserPinger(object):
                 f"You attempted to add yourself to protected group {message.body}.",
                 "Contact moderators to be added."
             ], message.author)
+            return
 
         self.logger.debug("Adding %s to group \"%s\"", message.author,
                           message.body)
@@ -310,5 +311,5 @@ class UserPinger(object):
             message=f"You've been added to group {message.body}")
         self.logger.debug("Added successfully")
 
-        self.update_wiki_page("groups", groups)
+        self.update_wiki_page("groups", groups, f"Added /u/{message.author} to Group {message.body}")
         return
