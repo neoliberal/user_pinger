@@ -373,7 +373,7 @@ class UserPinger(object):
             self.logger.debug("Group is not protected")
 
             self.logger.debug("Removing %s from group %s", author, body)
-            result: bool = groups.remove_option(body, str(author))
+            result: bool = groups.remove_option(body.upper(), str(author))
             if result is False:
                 self.logger.warning("Remove group request is invalid")
                 self._send_error_pm(f"Cannot remove non-member from {body}", [f"You could not be removed from group {body} because you are not a member"], author)
