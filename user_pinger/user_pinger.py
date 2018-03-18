@@ -1,9 +1,9 @@
-"""main classs"""
+"""main class"""
 from configparser import ConfigParser, ParsingError, NoSectionError
 import pickle
 import logging
 import signal
-from typing import Deque, List, Optional
+from typing import Deque, List, Optional, Callable, Dict
 
 import praw
 from slack_python_logging import slack_logger
@@ -25,7 +25,7 @@ class UserPinger(object):
         self.reddit: praw.Reddit = reddit
         self.subreddit: praw.models.Subreddit = self.reddit.subreddit(
             subreddit)
-        self.config: ConfigParser = self.get_wiki_page("config")
+        self.config: ConfigParser = self._get_wiki_page(["config"])
         self.parsed: Deque[str] = self.load()
         register_signals()
         self.logger.info("Successfully initialized")
@@ -70,13 +70,18 @@ class UserPinger(object):
             return
         return
 
-    def get_wiki_page(self, page: Optional[str] = None) -> ConfigParser:
+    def _make_userpinger_wiki_page(self, page: Optional[List[str]] = None) -> str:
+        """takes a list of pages and returns a completed one"""
+        combined_page: str = '/'.join(filter(None, ["userpinger"] + page))
+        self.logger.debug("Getting wiki page \"%s\"", combined_page)
+        return combined_page
+
+    def _get_wiki_page(self, page: Optional[List[str]] = None) -> ConfigParser:
         """gets current groups"""
         groups: ConfigParser = ConfigParser(allow_no_value=True)
         groups.optionxform = lambda option: option  # type: ignore
 
-        combined_page: str = '/'.join(filter(None, ["userpinger", page]))
-        self.logger.debug("Getting wiki page \"%s\"", combined_page)
+        combined_page: str = self._make_userpinger_wiki_page(page)
         import prawcore
         try:
             groups.read_string(self.subreddit.wiki[combined_page].content_md)
@@ -92,16 +97,29 @@ class UserPinger(object):
         self.logger.debug("Successfully got groups")
         return groups
 
-    def update_wiki_page(self, page: str, groups: ConfigParser, message: str) -> None:
+    def _update_wiki_page(self, page: Optional[List[str]], config: ConfigParser, message: str) -> None:
         """updates wiki page with new groups"""
         import io
         self.logger.debug("Updating wiki page")
         stream: io.StringIO = io.StringIO()
-        groups.write(stream)
-        self.subreddit.wiki[f"userpinger/{page}"].edit(stream.getvalue(), reason=message)
+        config.write(stream)
+        combined_page: str = self._make_userpinger_wiki_page(page)
+        self.subreddit.wiki[combined_page].edit(stream.getvalue(), reason=message)
         stream.close()
         self.logger.debug("Updated wiki page")
         return
+
+    def _send_pm(self, subject: str, body: List[str],
+                 author: praw.models.Redditor) -> None:
+        """sends PM"""
+        self.logger.debug("Sending PM to %s", author)
+        author.message(subject=subject, message="\n\n".join(body))
+        self.logger.debug("Sent PM to %s", author)
+        return
+
+    def _send_error_pm(self, subject: str, body: List[str], author: praw.models.Redditor) -> None:
+        self.logger.debug("Sending Error PM \"%s\" to %s", subject, author)
+        self._send_pm(f"Userpinger Error: {subject}", body, author)
 
     def listen(self) -> None:
         """lists to subreddit's comments for pings"""
@@ -113,12 +131,10 @@ class UserPinger(object):
                     break
                 if str(comment) in self.parsed:
                     continue
-                self.handle(comment)
+                self.handle_comment(comment)
             for message in self.reddit.inbox.unread(limit=1):
-                if isinstance(
-                        message,
-                        praw.models.Message) and message.subject == "addgroup":
-                    self.add_to_group(message)
+                if isinstance(message, praw.models.Message):
+                    self.handle_command(message)
                     message.mark_read()
         except prawcore.exceptions.ServerError:
             self.logger.error("Server error: Sleeping for 1 minute.")
@@ -130,16 +146,31 @@ class UserPinger(object):
             self.logger.error("Request error: Sleeping for 1 minute.")
             sleep(60)
 
-    def get_group_members(self, request: str,
-                          groups: ConfigParser) -> Optional[List[str]]:
-        try:
-            users: List[str] = groups.options(request)
-        except NoSectionError:
-            return None
-        else:
-            return users
+    def group_exists(self, request: str, groups: ConfigParser) -> bool:
+        """checks if group is in config"""
+        return request.lower() in [section.lower() for section in groups.sections()]
 
-    def handle(self, comment: praw.models.Comment) -> None:
+    def in_group(self, author: praw.models.Redditor, users: List[str]) -> bool:
+        """checks if author belongs to group"""
+        return str(author).lower() in [user.lower() for user in users]
+
+    def get_group_members(self, request: str, groups: ConfigParser) -> List[str]:
+        """returns members of group"""
+        return groups.options(request.upper())
+
+    def public_group(self, group: str) -> bool:
+        """checks if group is public, and can be pinged by anyone"""
+        return group.lower() in self.config.options("public")
+
+    def protected_group(self, group: str) -> bool:
+        """check if group is protected and can only be added to by moderators"""
+        return group.lower() in self.config.options("protected")
+
+    def is_moderator(self, author: praw.models.Subreddit) -> bool:
+        """checks if author is a moderator"""
+        return author in self.subreddit.moderator()
+
+    def handle_comment(self, comment: praw.models.Comment) -> None:
         """handles ping"""
         split: List[str] = comment.body.upper().split()
         self.parsed.append(str(comment))
@@ -162,66 +193,36 @@ class UserPinger(object):
 
     def handle_ping(self, group: str, comment: praw.models.Comment) -> None:
         """handles ping"""
-
-        def in_group(author: praw.models.Redditor, users: List[str]) -> bool:
-            """checks if author belongs to group"""
-            return str(author).lower() in [user.lower() for user in users]
-
-        def public_group(group: str) -> bool:
-            """checks if group is public, and can be pinged by anyone"""
-            return group.lower() in self.config.options("public")
-
-        def is_moderator(author: praw.models.Subreddit) -> bool:
-            """checks if author is a moderator"""
-            return author in self.subreddit.moderator()
-
         self.logger.debug("Handling ping")
 
         self.logger.debug("Updating config")
-        self.config = self.get_wiki_page("config")
+        self.config = self._get_wiki_page(["config"])
         self.logger.debug("Updated config")
 
         self.logger.debug("Getting groups")
-        groups: ConfigParser = self.get_wiki_page("groups")
+        groups: ConfigParser = self._get_wiki_page(["config", "groups"])
         self.logger.debug("Got groups")
 
         self.logger.debug("Getting users in group")
-        users: Optional[List[str]] = self.get_group_members(group, groups)
-        if users is None:
-            self.logger.warning("Group \"%s\" by %s does not exist", group,
-                                comment.author)
-            self.send_error_pm(
-                [f"You pinged group {group} that does not exist"],
-                comment.author)
+
+        if self.group_exists(group, groups) is False:
+            self.logger.warning("Group \"%s\" by %s does not exist", group, comment.author)
+            self._send_pm("Invalid Ping", [f"You pinged group {group} that does not exist"], comment.author)
             return
+        users: Optional[List[str]] = self.get_group_members(group, groups)
         self.logger.debug("Got users in group")
 
         self.logger.debug("Checking if author is in group or group is public")
-        if not (in_group(comment.author, users) or public_group(group)
-                or is_moderator(comment.author)):
-            self.logger.warning("Non-member %s tried to ping \"%s\" group",
-                                comment.author, group)
-            self.send_error_pm([
-                f"You need to be a member of {group} to ping it",
-                "If you would like to be added, please contact the moderators"
-            ], comment.author)
+        if not (self.in_group(comment.author, users) or self.public_group(group) or self.is_moderator(comment.author)):
+            self.logger.warning("Non-member %s tried to ping \"%s\" group", comment.author, group)
+            self._send_error_pm(f"Cannot ping Group {group}", [f"You need to be a member of {group} to ping it"], comment.author)
             return
         self.logger.debug("Checked that author is in group")
 
         self.ping_users(group, users, comment)
         return
 
-    def send_error_pm(self, errors: List[str],
-                      author: praw.models.Redditor) -> None:
-        """sends error PM"""
-        self.logger.debug("Sending error PM to %s", author)
-        errors.append(
-            "If you believe this is a mistake, please contact the moderators")
-        author.message(subject="Ping Error", message="\n\n".join(errors))
-        return
-
-    def ping_users(self, group: str, users: List[str],
-                   comment: praw.models.Comment) -> None:
+    def ping_users(self, group: str, users: List[str], comment: praw.models.Comment) -> None:
         """pings users"""
 
         def post_comment() -> praw.models.Comment:
@@ -230,9 +231,7 @@ class UserPinger(object):
 
         def edit_comment(posted: praw.models.Comment) -> None:
             """edits comment to reflect all users pinged"""
-            body: str = "\n\n".join(
-                [f"Pinged members of {group} group.", "---",
-                 make_footer()])
+            body: str = "\n\n".join([f"Pinged members of {group} group.", "---", make_footer()])
             posted.edit(body)
 
         def make_footer() -> str:
@@ -254,9 +253,9 @@ class UserPinger(object):
                 continue
             try:
                 self.reddit.redditor(user).message(
-                    subject=
-                    f"You've been pinged by /u/{comment.author} in group {group}",
-                    message=f"[Click here to view the comment](https://www.reddit.com{str(comment.permalink)}?context=1000)")
+                    subject=f"You've been pinged by /u/{comment.author} in group {group}",
+                    message=f"[Click here to view the comment](https://www.reddit.com{str(comment.permalink)}?context=1000)"
+                )
             except praw.exceptions.APIException:
                 self.logger.debug("%s could not be found in group %s, skipping", user, group)
         self.logger.debug("Pinged individual users")
@@ -268,48 +267,334 @@ class UserPinger(object):
         self.logger.debug("Pinged group \"%s\"", group)
         return
 
-    def add_to_group(self, message: praw.models.Message) -> None:
-        """adds member to group"""
+    def handle_command(self, message: praw.models.Message) -> None:
+        self.logger.debug("Updating config")
+        self.config = self._get_wiki_page(["config"])
+        self.logger.debug("Updated config")
 
-        def protected_group(group: str) -> bool:
-            """check if group is protected and can only be added to by moderators"""
-            return group.lower() in self.config.options("protected")
-
-        self.logger.debug("Handling addgroup request")
-
-        self.logger.debug("Getting groups")
-        groups: ConfigParser = self.get_wiki_page("groups")
-        self.logger.debug("Got groups")
-
-        self.logger.debug("Checking if request exists")
-        if self.get_group_members(message.body, groups) is None:
-            self.logger.warning(
-                f"Add group request {message.body} by {message.author} is invalid"
-            )
-            self.send_error_pm(
-                ["Your add group request {message.body} is invalid"],
-                message.author)
-            return
-        self.logger.debug("Added member to group")
-
-        self.logger.debug("Checking if group is protected")
-        if protected_group(message.body):
-            self.logger.warning(
-                "%s tried to add themselves to protected group \"%s\"",
-                message.author, message.body)
-            self.send_error_pm([
-                f"You attempted to add yourself to protected group {message.body}.",
-                "Contact moderators to be added."
-            ], message.author)
+        if message.subject.lower() not in (self.config.options("commands") + self.config.options("mod_commands")):
+            self._send_error_pm("Invalid Command", [f"Your command {message.subject} was invalid"], message.author)
             return
 
-        self.logger.debug("Adding %s to group \"%s\"", message.author,
-                          message.body)
-        groups.set(message.body, str(message.author), None)
-        message.author.message(
-            subject="Added to group",
-            message=f"You've been added to group {message.body}")
-        self.logger.debug("Added successfully")
+        is_mod: bool = self.is_moderator(message.author)
+        if message.subject.lower() in self.config.options("mod_commands") and not is_mod:
+            self._send_error_pm("Mod-only Command", [f"Your command {message.subject} is mod-only"], message.author)
+            return
 
-        self.update_wiki_page("groups", groups, f"Added /u/{message.author} to Group {message.body}")
+        self.run_command(message, is_mod)
+        return
+
+    def run_command(self, command: praw.models.Message, mod: bool) -> None:
+        def help_command(_, author: praw.models.Redditor) -> None:
+            """
+            Gets all avaliable commands to the user
+
+            Usage:
+            subject = help
+            body = [anything]
+            """
+            self.logger.debug("Setting appropriate commands")
+            if mod:
+                help_commands = {**public_commands, **mod_commands}
+            else:
+                help_commands = public_commands
+            self.logger.debug("Set appropriate commands")
+
+            self.logger.debug("Creating list of commands")
+            commands_list: List[str] = [
+                f"##{name}\n\n{function.___doc___}" #type: ignore
+                for name, function in help_commands
+            ]
+            self.logger.debug("Set list of commands")
+
+            self._send_pm("Userpinger Commands", commands_list, author)
+            return
+
+        def add_to_group(body: str, author: praw.models.Redditor) -> None:
+            """
+            Adds member to a Group
+
+            Usage: 
+            subject = addtogroup
+            body = [group you want to be added to]
+            """
+            self.logger.debug("Getting groups")
+            groups: ConfigParser = self._get_wiki_page(["groups"])
+            self.logger.debug("Got groups")
+
+            self.logger.debug("Checking if group exists")
+            if self.group_exists(body, groups) is False:
+                self.logger.warning(f"Add group request {body} by {author} is invalid")
+                self._send_error_pm("Invalid add group request", ["Your add group request {body} is invalid"], author)
+                return
+            self.logger.debug("Group exists")
+
+            self.logger.debug("Checking if group is protected")
+            if self.protected_group(body):
+                self.logger.warning("%s tried to add themselves to protected group \"%s\"", author, body)
+                self._send_error_pm("Attempted to add to protected group", [f"You attempted to add yourself to protected group {body}."], author)
+                return
+            self.logger.debug("Group is not protected")
+
+            self.logger.debug("Adding %s to group \"%s\"", author, body)
+            groups.set(body, str(author), None)
+            self._send_pm("Added to Group", [f"You've been added to group {body}"], author)
+            self.logger.debug("Added successfully")
+
+            self._update_wiki_page(["config", "groups"], groups, f"Added /u/{author} to Group {body}")
+            return
+
+        def remove_from_group(body: str, author: praw.models.Redditor) -> None:
+            """
+            Removes member from a Group
+
+            Usage: 
+            subject = removefromgroup
+            body = [group you want to be removed from]
+            """
+            self.logger.debug("Getting groups")
+            groups: ConfigParser = self._get_wiki_page(["config", "groups"])
+            self.logger.debug("Got groups")
+
+            self.logger.debug("Checking if group exists")
+            if self.group_exists(body, groups) is None:
+                self.logger.warning(f"Remove group request {body} by {author} is invalid")
+                self._send_error_pm(f"Group {body} does not exist", [f"You attempted to remove yourself from group {body} which does not exist"], author)
+                return
+            self.logger.debug("Group exists")
+
+            self.logger.debug("Checking if group is protected")
+            if self.protected_group(body):
+                self.logger.warning(
+                    "%s tried to remove themselves to protected group \"%s\"",
+                    author, body)
+                self._send_error_pm("Attempted to remove to protect group", [f"You attempted to remove yourself from protected group {body}."], author)
+                return
+            self.logger.debug("Group is not protected")
+
+            self.logger.debug("Removing %s from group %s", author, body)
+            result: bool = groups.remove_option(body, str(author))
+            if result is False:
+                self.logger.warning("Remove group request is invalid")
+                self._send_error_pm(f"Cannot remove non-member from {body}", [f"You could not be removed from group {body} because you are not a member"], author)
+            self.logger.debug("Removed from group")
+
+            self._update_wiki_page(["config", "groups"], groups, message=f"Removed /u/{author} from Group {body}")
+            return
+
+        def list_groups(_, author: praw.models.Redditor) -> None:
+            """
+            Returns a List of all available groups
+
+            Usage: 
+            subject = list
+            body = [anything]
+            """
+            self.logger.debug("Getting groups")
+            groups: ConfigParser = self._get_wiki_page(["config", "groups"])
+            self.logger.debug("Got groups")
+
+            self.logger.debug("Joining groups")
+            groups_list: str = ', '.join(groups.sections())
+            self.logger.debug("Joined groups")
+
+            self._send_pm("Avaliable Groups", [groups_list], author)
+            return
+
+        def protect_group(body: str, author: praw.models.Redditor) -> None:
+            """
+            Protects a group [mod-only]
+
+            Usage:
+            subject = protectgroup
+            body = [group to be protected]
+            """
+            self.logger.debug("Getting groups")
+            groups: ConfigParser = self._get_wiki_page(["config", "groups"])
+            self.logger.debug("Got groups")
+
+            self.logger.debug("Checking if group exists")
+            if self.group_exists(body, groups) is False:
+                self.logger.warning("Attempted to protect non-existent group")
+                return
+            self.logger.debug("Group exists")
+
+            self.logger.debug("Protecting group")
+            self.config.set("protected", body, None)
+            self.logger.debug("Protected group")
+
+            self._update_wiki_page(["config"], self.config, f"Made Group {body} protected")
+            return
+
+        def unprotect_group(body: str, author: praw.models.Redditor) -> None:
+            """
+            Unprotects a group [mod-only]
+
+            Usage:
+            subject = unprotectgroup
+            body = [group to be unprotected]
+            """
+            self.logger.debug("Getting groups")
+            groups: ConfigParser = self._get_wiki_page(["config", "groups"])
+            self.logger.debug("Got groups")
+
+            self.logger.debug("Checking if group exists")
+            if self.group_exists(body, groups) is False:
+                self.logger.warning("Attempted to unprotect non-existent group")
+                return
+            self.logger.debug("Group exists")
+
+            self.logger.debug("Making group unprotected")
+            self.config.remove_option("protected", body)
+            self.logger.debug("Made group unprotected")
+
+            self._update_wiki_page(["config"], self.config, f"Made Group {body} unprotected")
+            return
+
+        def make_public_group(body: str, author: praw.models.Redditor) -> None:
+            """
+            Makes group public (if not already) [mod-only]
+
+            Usage:
+            subject = makepublicgroup
+            body = [group to be made public]
+            """
+            self.logger.debug("Getting groups")
+            groups: ConfigParser = self._get_wiki_page(["config", "groups"])
+            self.logger.debug("Got groups")
+
+            self.logger.debug("Checking if group exists")
+            if self.group_exists(body, groups) is False:
+                self.logger.warning("Attempted to protect non-existent group")
+                return
+            self.logger.debug("Group exists")
+
+            self.logger.debug("Making group public")
+            self.config.set("public", body, None)
+            self.logger.debug("Made group public")
+
+            self._update_wiki_page(["config"], self.config, f"Made Group {body} public")
+            return
+
+        def make_private_group(body: str, author: praw.models.Redditor) -> None:
+            """
+            Makes group private (if not already) [mod-only]
+
+            Usage:
+            subject = makeprivategroup
+            body = [group to be made private]
+            """
+            self.logger.debug("Getting groups")
+            groups: ConfigParser = self._get_wiki_page(["config", "groups"])
+            self.logger.debug("Got groups")
+
+            self.logger.debug("Checking if group exists")
+            if self.group_exists(body, groups) is False:
+                self.logger.warning("Attempted to make non-existent group private")
+                return
+            self.logger.debug("Group exists")
+
+            self.logger.debug("Making group private")
+            self.config.remove_option("private", body)
+            self.logger.debug("Made group private")
+
+            self._update_wiki_page(["config"], self.config, f"Made Group {body} private")
+            return
+
+        def create_group(body: str, author: praw.models.Redditor) -> None:
+            """
+            Creates group (if it doesn't exist) [mod-only]
+
+            Usage:
+            subject = creategroup
+            body = [group to create]
+
+            Note:
+            Moderator will be a member of the group
+            """
+            self.logger.debug("Getting groups")
+            groups: ConfigParser = self._get_wiki_page(["config", "groups"])
+            self.logger.debug("Got groups")
+
+            self.logger.debug("Checking if group exists")
+            if self.group_exists(body, groups) is True:
+                self.logger.warning("Attempted to make group that already exists")
+                return
+            self.logger.debug("Group exists")
+
+            self.logger.debug("Creating group")
+            groups.add_section(body.upper())
+            groups.set(body.upper(), author, None)
+            self.logger.debug("Created group")
+
+            self._update_wiki_page(["config", "groups"], groups, f"Created new Group {body.upper()}")
+            return
+
+        def delete_group(body: str, author: praw.models.Redditor) -> None:
+            """
+            Delete group (if it exists) [mod-only]
+
+            Usage:
+            subject = deletegroup
+            body = [group to be made public]
+            """
+            self.logger.debug("Getting groups")
+            groups: ConfigParser = self._get_wiki_page(["config", "groups"])
+            self.logger.debug("Got groups")
+
+            self.logger.debug("Checking if group exists")
+            if self.group_exists(body, groups) is False:
+                self.logger.warning("Attempted to delete group that does not exists")
+                return
+            self.logger.debug("Group exists")
+
+            self.logger.debug("Removing group")
+            groups.remove_section()(body.upper())
+            self.logger.debug("Removed group")
+
+            self._update_wiki_page(["config", "groups"], groups, f"Removed Group {body.upper()}")
+            return
+
+        def add_user_to_group(body: str, author: praw.models.Reddit) -> None:
+            """
+            Adds user to group (if it exists) [mod-only]
+
+            Usage:
+            subject = addusertogroup
+            body = [group to add to], [user]
+            """
+            return
+
+        def remove_user_from_group(body: str, author: praw.models.Reddit) -> None:
+            """
+            Removes user from group (if it exists) [mod-only]
+
+            Usage:
+            subject = removeuserfromgroup
+            body = [group to remove from], [user]
+            """
+            return
+
+        public_commands: Dict[str, Callable[[str, praw.models.Redditor], None]] = {
+                "help": help_command,
+                "addtogroup": add_to_group,
+                "removefromgroup": remove_from_group,
+                "list": list_groups
+            }
+
+        mod_commands: Dict[str, Callable[[str, praw.models.Redditor], None]] = {
+                "protectgroup": protect_group,
+                "unprotectgroup": unprotect_group,
+                "makepublicgroup": make_public_group,
+                "makeprivategroup": make_private_group,
+                "creategroup": create_group,
+                "deletegroup": delete_group,
+                "addusertogroup": add_user_to_group,
+                "removeuserfromgroup": remove_user_from_group,
+            }
+
+        if mod:
+            {**public_commands, **mod_commands}[command.subject](command.body.lower(), command.author)
+        else:
+            public_commands[command.subject](command.body.lower(), command.author)
         return
