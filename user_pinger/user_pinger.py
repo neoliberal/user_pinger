@@ -337,9 +337,9 @@ class UserPinger(object):
 
             self.logger.debug("Adding %s to group \"%s\"", author, body)
             groups.set(body, str(author), None)
-            self._send_pm("Added to Group", [f"You've been added to group {body}"], author)
             self.logger.debug("Added successfully")
 
+            self._send_pm(f"Added to Group {body.upper()}", [f"You were added to group {body.upper()}"], author)
             self._update_wiki_page(["config", "groups"], groups, f"Added /u/{author} to Group {body}")
             return
 
@@ -378,6 +378,7 @@ class UserPinger(object):
                 self._send_error_pm(f"Cannot remove non-member from {body}", [f"You could not be removed from group {body} because you are not a member"], author)
             self.logger.debug("Removed from group")
 
+            self._send_pm(f"Removed from Group {body.upper()}", [f"You were removed from group {body.upper()}"], author)
             self._update_wiki_page(["config", "groups"], groups, message=f"Removed /u/{author} from Group {body}")
             return
 
