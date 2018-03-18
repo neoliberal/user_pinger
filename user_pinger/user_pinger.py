@@ -302,8 +302,8 @@ class UserPinger(object):
 
             self.logger.debug("Creating list of commands")
             commands_list: List[str] = [
-                f"##{name}\n\n{function.___doc___}" #type: ignore
-                for name, function in help_commands
+                f"##{name}\n\n{function.__doc__}"
+                for name, function in help_commands.items()
             ]
             self.logger.debug("Set list of commands")
 
