@@ -109,6 +109,9 @@ class UserPinger(object):
         self.logger.debug("Updated wiki page")
         return
 
+    def _command_link(self, name: str, subject: str, body: str) -> str:
+        return f"[{name}](https://reddit.com/message/compose?to={str(self.reddit.user.me())}&subject={subject}&message={body})"
+
     def _send_pm(self, subject: str, body: List[str], author: praw.models.Redditor) -> None:
         """sends PM"""
         self.logger.debug("Sending PM to %s", author)
@@ -536,7 +539,7 @@ class UserPinger(object):
             groups.set(body.upper(), str(author), None)
             self.logger.debug("Created group")
 
-            self._send_pm(f"Created Group {body.upper}", ["Group created"], author)
+            self._send_pm(f"Created Group {body.upper()}", ["Group created"], author)
             self._update_wiki_page(["config", "groups"], groups, f"Created new Group {body.upper()}")
             return
 
