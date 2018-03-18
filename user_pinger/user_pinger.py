@@ -594,7 +594,7 @@ class UserPinger(object):
             }
 
         if mod:
-            {**public_commands, **mod_commands}[command.subject](command.body.trim().lower(), command.author)
+            {**public_commands, **mod_commands}[command.subject](command.body.lower(), command.author)
         else:
-            public_commands[command.subject](command.body.trim().lower(), command.author)
+            public_commands[command.subject](command.body.lower(), command.author)
         return
