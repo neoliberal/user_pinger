@@ -549,13 +549,13 @@ class UserPinger(object):
             self.logger.debug("Group exists")
 
             self.logger.debug("Removing group")
-            groups.remove_section()(body.upper())
+            groups.remove_section(body.upper())
             self.logger.debug("Removed group")
 
             self._update_wiki_page(["config", "groups"], groups, f"Removed Group {body.upper()}")
             return
 
-        def add_user_to_group(body: str, author: praw.models.Reddit) -> None:
+        def add_user_to_group(body: str, author: praw.models.Redditor) -> None:
             """
             Adds user to group (if it exists) [mod-only]
 
@@ -565,7 +565,7 @@ class UserPinger(object):
             """
             return
 
-        def remove_user_from_group(body: str, author: praw.models.Reddit) -> None:
+        def remove_user_from_group(body: str, author: praw.models.Redditor) -> None:
             """
             Removes user from group (if it exists) [mod-only]
 
