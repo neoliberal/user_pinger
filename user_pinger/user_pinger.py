@@ -109,8 +109,7 @@ class UserPinger(object):
         self.logger.debug("Updated wiki page")
         return
 
-    def _send_pm(self, subject: str, body: List[str],
-                 author: praw.models.Redditor) -> None:
+    def _send_pm(self, subject: str, body: List[str], author: praw.models.Redditor) -> None:
         """sends PM"""
         self.logger.debug("Sending PM to %s", author)
         author.message(subject=subject, message="\n\n".join(body))
@@ -148,7 +147,7 @@ class UserPinger(object):
 
     def group_exists(self, request: str, groups: ConfigParser) -> bool:
         """checks if group is in config"""
-        return request.lower() in [section.lower() for section in groups.sections()]
+        return groups.has_section(request.upper())
 
     def in_group(self, author: praw.models.Redditor, users: List[str]) -> bool:
         """checks if author belongs to group"""
