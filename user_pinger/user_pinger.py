@@ -133,6 +133,9 @@ class UserPinger(object):
                 self.handle_comment(comment)
             for message in self.reddit.inbox.unread(limit=1):
                 if isinstance(message, praw.models.Message):
+                    if message.author is None:
+                        message.mark_read()
+                        continue
                     self.handle_command(message)
                     message.mark_read()
         except prawcore.exceptions.ServerError:
