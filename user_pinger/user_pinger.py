@@ -267,18 +267,24 @@ class UserPinger(object):
         return
 
     def handle_command(self, message: praw.models.Message) -> None:
+        self.logger.debug("Handling Command %s by %s", message.subject, message.author)
+
         self.logger.debug("Updating config")
         self.config = self._get_wiki_page(["config"])
         self.logger.debug("Updated config")
 
+        self.logger.debug("Checking if command is valid")
         if message.subject.lower() not in (self.config.options("commands") + self.config.options("mod_commands")):
             self._send_error_pm("Invalid Command", [f"Your command {message.subject} was invalid"], message.author)
             return
+        self.logger.debug("Command is valid")
 
+        self.logger.debug("Checking if command is mod-only by non-moderator")
         is_mod: bool = self.is_moderator(message.author)
         if message.subject.lower() in self.config.options("mod_commands") and not is_mod:
             self._send_error_pm("Mod-only Command", [f"Your command {message.subject} is mod-only"], message.author)
             return
+        self.logger.debug("Command is not mod-only by non-moderator")
 
         self.run_command(message, is_mod)
         return
