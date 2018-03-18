@@ -521,11 +521,12 @@ class UserPinger(object):
                 return
             self.logger.debug("Group exists")
 
-            self.logger.debug("Creating group")
+            self.logger.debug("Creating group %s", body.upper())
             groups.add_section(body.upper())
             groups.set(body.upper(), str(author), None)
             self.logger.debug("Created group")
 
+            self._send_pm(f"Created Group {body.upper}", ["Group created"], author)
             self._update_wiki_page(["config", "groups"], groups, f"Created new Group {body.upper()}")
             return
 
@@ -547,10 +548,11 @@ class UserPinger(object):
                 return
             self.logger.debug("Group exists")
 
-            self.logger.debug("Removing group")
+            self.logger.debug("Removing group %s", body)
             groups.remove_section(body.upper())
             self.logger.debug("Removed group")
 
+            self._send_pm(f"Removed Group {body.upper}", ["Group removed"], author)
             self._update_wiki_page(["config", "groups"], groups, f"Removed Group {body.upper()}")
             return
 
