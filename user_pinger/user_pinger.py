@@ -524,7 +524,7 @@ class UserPinger(object):
 
             self.logger.debug("Creating group")
             groups.add_section(body.upper())
-            groups.set(body.upper(), author, None)
+            groups.set(body.upper(), str(author), None)
             self.logger.debug("Created group")
 
             self._update_wiki_page(["config", "groups"], groups, f"Created new Group {body.upper()}")
