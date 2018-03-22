@@ -3,7 +3,7 @@ from configparser import ConfigParser, ParsingError, NoSectionError
 import pickle
 import logging
 import signal
-from typing import Deque, List, Optional, Callable, Dict
+from typing import Deque, List, Optional, Callable, Dict, Tuple
 
 import praw
 from slack_python_logging import slack_logger
@@ -108,9 +108,12 @@ class UserPinger(object):
         stream.close()
         self.logger.debug("Updated wiki page")
         return
+    
+    def _footer(self, commands: List[Tuple[str, ...]]) -> str:
+        return ' | '.join([self._userpinger_github_link()] + [self._command_link(*command) for command in command])
 
     def _userpinger_github_link(self) -> str:
-        return ""
+        return "[user_pinger](https://github.com/neoliberal/user_pinger)"
 
     def _command_link(self, name: str, subject: str, body: str) -> str:
         return f"[{name}](https://reddit.com/message/compose?to={str(self.reddit.user.me())}&subject={subject}&message={body})"
@@ -239,16 +242,8 @@ class UserPinger(object):
 
         def edit_comment(posted: praw.models.Comment) -> None:
             """edits comment to reflect all users pinged"""
-            body: str = "\n\n".join([f"Pinged members of {group} group.", "---", make_footer()])
+            body: str = "\n\n".join([f"Pinged members of {group} group.", "---", self._footer([("Request to be added to this group", "addtogroup", group)])])
             posted.edit(body)
-
-        def make_footer() -> str:
-            """"make footer for comment"""
-            body: str = self._command_link("Request", "addtogroup", group)
-            return (
-                "[user_pinger](https://github.com/neoliberal/user_pinger) | "
-                f"{body}"
-                " | to join this group")
 
         self.logger.debug("Pinging group")
 
