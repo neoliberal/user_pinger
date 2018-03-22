@@ -333,7 +333,7 @@ class UserPinger(object):
             self.logger.debug("Got groups")
 
             self.logger.debug("Checking if group exists")
-            if self.group_exists(body, groups) is False:
+            if self.group_exists(body.upper(), groups) is False:
                 self.logger.warning(f"Add group request {body} by {author} is invalid")
                 self._send_error_pm("Invalid add group request", [f"Your add group request {body} is invalid"], author)
                 return
