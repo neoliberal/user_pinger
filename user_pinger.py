@@ -109,6 +109,9 @@ class UserPinger(object):
         self.logger.debug("Updated wiki page")
         return
 
+    def _userpinger_github_link(self) -> str:
+        return ""
+
     def _command_link(self, name: str, subject: str, body: str) -> str:
         return f"[{name}](https://reddit.com/message/compose?to={str(self.reddit.user.me())}&subject={subject}&message={body})"
 
@@ -241,10 +244,11 @@ class UserPinger(object):
 
         def make_footer() -> str:
             """"make footer for comment"""
+            body: str = self._command_link("Request", "addtogroup", group)
             return (
                 "[user_pinger](https://github.com/neoliberal/user_pinger) | "
-                f"[Request](https://reddit.com/message/compose?to={str(self.reddit.user.me())}&subject=addgroup&message={group})"
-                " to join this group")
+                f"{body}"
+                " | to join this group")
 
         self.logger.debug("Pinging group")
 
