@@ -347,7 +347,7 @@ class UserPinger(object):
             self.logger.debug("Group is not protected")
 
             self.logger.debug("Adding %s to group \"%s\"", author, body)
-            groups.set(body, str(author), None)
+            groups.set(body.upper(), str(author), None)
             self.logger.debug("Added successfully")
 
             self._send_pm(f"Added to Group {body.upper()}", [f"You were added to group {body.upper()}"], author)
