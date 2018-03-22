@@ -110,7 +110,7 @@ class UserPinger(object):
         return
     
     def _footer(self, commands: List[Tuple[str, ...]]) -> str:
-        return ' | '.join([self._userpinger_github_link()] + [self._command_link(*command) for command in command])
+        return ' | '.join([self._userpinger_github_link()] + [self._command_link(*command) for command in commands])
 
     def _userpinger_github_link(self) -> str:
         return "[user_pinger](https://github.com/neoliberal/user_pinger)"
