@@ -329,11 +329,11 @@ class UserPinger(object):
             body = [group you want to be added to]
             """
             self.logger.debug("Getting groups")
-            groups: ConfigParser = self._get_wiki_page(["groups"])
+            groups: ConfigParser = self._get_wiki_page(["config", "groups"])
             self.logger.debug("Got groups")
 
             self.logger.debug("Checking if group exists")
-            if self.group_exists(body.upper(), groups) is False:
+            if self.group_exists(body, groups) is False:
                 self.logger.warning(f"Add group request {body} by {author} is invalid")
                 self._send_error_pm("Invalid add group request", [f"Your add group request {body} is invalid"], author)
                 return
