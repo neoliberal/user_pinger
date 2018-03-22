@@ -351,7 +351,7 @@ class UserPinger(object):
             self.logger.debug("Added successfully")
 
             self._send_pm(f"Added to Group {body.upper()}", [f"You were added to group {body.upper()}"], author)
-            self._update_wiki_page(["config", "groups"], groups, f"Added /u/{author} to Group {body}")
+            self._update_wiki_page(["config", "groups"], groups, f"Added /u/{author} to Group {body.upper()}")
             return
 
         def remove_from_group(body: str, author: praw.models.Redditor) -> None:
