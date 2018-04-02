@@ -126,6 +126,8 @@ class UserPinger(object):
         return
 
     def _send_error_pm(self, subject: str, body: List[str], author: praw.models.Redditor) -> None:
+        safe_subject = (subject[:75] + '...') if len(subject) > 75 else subject
+        safe_body = (body[:75] + '...') if len(body) > 75 else body
         self.logger.debug("Sending Error PM \"%s\" to %s", subject, author)
         self._send_pm(f"Userpinger Error: {subject}", body, author)
 
