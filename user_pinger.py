@@ -272,29 +272,46 @@ class UserPinger(object):
         return
 
     def handle_command(self, message: praw.models.Message) -> None:
-        self.logger.debug("Handling Command %s by %s", message.subject, message.author)
+        body: str = message.body.lower()
+        words: list = body.split()
+        command: str = words[0]
+        data: str = ' '.join(words[1:])
+        author: praw.models.Redditor = message.author
+
+        self.logger.debug("Handling Command %s by %s", command, author)
 
         self.logger.debug("Updating config")
         self.config = self._get_wiki_page(["config"])
         self.logger.debug("Updated config")
 
         self.logger.debug("Checking if command is valid")
-        if message.subject.lower() not in (self.config.options("commands") + self.config.options("mod_commands")):
-            self._send_error_pm("Invalid Command", [f"Your command {message.subject} was invalid"], message.author)
-            return
-        self.logger.debug("Command is valid")
 
-        self.logger.debug("Checking if command is mod-only by non-moderator")
-        is_mod: bool = self.is_moderator(message.author)
-        if message.subject.lower() in self.config.options("mod_commands") and not is_mod:
-            self._send_error_pm("Mod-only Command", [f"Your command {message.subject} is mod-only"], message.author)
-            return
-        self.logger.debug("Command is not mod-only by non-moderator")
+        public_commands: list = self.config.options("commands")
+        mod_commands: list = self.config.options("mod_commands")
+        all_commands: list = public_commands + mod_commands
 
-        self.run_command(message, is_mod)
+        if command in all_commands:
+            self.logger.debug("Checking if command is mod-only by non-moderator")
+            is_mod: bool = self.is_moderator(author)
+
+            if command in mod_commands and not is_mod:
+                self._send_error_pm("Mod-only Command", [f"Your command {command} is mod-only"], author)
+                return
+
+            self.logger.debug("Command is not mod-only by non-moderator")
+            self.run_command(author, is_mod, command, data)
+        else:
+            self._send_error_pm("Invalid Command", [f"Your command {command} was invalid"], author)
+
         return
 
-    def run_command(self, command: praw.models.Message, mod: bool) -> None:
+    def run_command (
+        self,
+        author: praw.models.Redditor,
+        mod: bool,
+        command: str, # Command heading (formerly the subject)
+        data: str # Command data (group, etc)
+    ) -> None:
         def help_command(_, author: praw.models.Redditor) -> None:
             """
             Gets all avaliable commands to the user
@@ -373,24 +390,35 @@ class UserPinger(object):
                 return
             self.logger.debug("Group exists")
 
-            self.logger.debug("Checking if group is protected")
-            if self.protected_group(body):
-                self.logger.warning(
-                    "%s tried to remove themselves to protected group \"%s\"",
-                    author, body)
-                self._send_error_pm("Attempted to remove to protect group", [f"You attempted to remove yourself from protected group {body}."], author)
-                return
-            self.logger.debug("Group is not protected")
-
             self.logger.debug("Removing %s from group %s", author, body)
             result: bool = groups.remove_option(body.upper(), str(author))
+
             if result is False:
                 self.logger.warning("Remove group request is invalid")
                 self._send_error_pm(f"Cannot remove non-member from {body}", [f"You could not be removed from group {body} because you are not a member"], author)
-            self.logger.debug("Removed from group")
+            else:
+                self.logger.debug("Removed from group")
+                self._send_pm(f"Removed from Group {body.upper()}", [f"You were removed from group {body.upper()}"], author)
+                self._update_wiki_page(["config", "groups"], groups, message=f"Removed /u/{author} from Group {body}")
 
-            self._send_pm(f"Removed from Group {body.upper()}", [f"You were removed from group {body.upper()}"], author)
-            self._update_wiki_page(["config", "groups"], groups, message=f"Removed /u/{author} from Group {body}")
+            return
+
+        def unsubscribe(_, author: praw.models.Redditor) -> None:
+            """
+            Removes a user from all Groups
+
+            Usage:
+            subject = unsubscribe
+            body = [anything]
+            """
+            self.logger.debug("Getting groups")
+            groups: ConfigParser = self._get_wiki_page(["config", "groups"])
+            self.logger.debug("Got groups")
+
+            for (group_name, username) in groups.items():
+                if str(author) == username:
+                    groups.remove_option(group_name, username)
+
             return
 
         def list_groups(_, author: praw.models.Redditor) -> None:
@@ -592,6 +620,7 @@ class UserPinger(object):
                 "help": help_command,
                 "addtogroup": add_to_group,
                 "removefromgroup": remove_from_group,
+                "unsubscribe": unsubscribe,
                 "list": list_groups
             }
 
@@ -607,7 +636,8 @@ class UserPinger(object):
             }
 
         if mod:
-            {**public_commands, **mod_commands}[command.subject.lower()](command.body.lower(), command.author)
+            {**public_commands, **mod_commands}[command](data, author)
         else:
-            public_commands[command.subject.lower()](command.body.lower(), command.author)
+            public_commands[command](data, author)
+
         return
