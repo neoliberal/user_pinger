@@ -256,8 +256,8 @@ class UserPinger(object):
             if user.lower() == str(comment.author).lower():
                 continue
             try:
-                unsub_group_msg: str = self._command_link("^^Click ^^here ^^to ^^unsubscribe ^^from ^^{group}", "Unsubscribe from {group}", "unsubscribe {group}")
-                unsub_all_msg: str = self._command_link("^^Click ^^here ^^to ^^unsubscribe ^^from ^^all ^^groups", "Unsubscribe from all groups", "unsubscribe")
+                unsub_group_msg: str = self._command_link(f"^^Click ^^here ^^to ^^unsubscribe ^^from ^^{group}", f"Unsubscribe from {group}", f"unsubscribe {group}")
+                unsub_all_msg: str = self._command_link(f"^^Click ^^here ^^to ^^unsubscribe ^^from ^^all ^^groups", "Unsubscribe from all groups", "unsubscribe")
                 self.reddit.redditor(user).message(
                     subject=f"You've been pinged by /u/{comment.author} in group {group}",
                     message=f"[Click here to view the comment](https://www.reddit.com{str(comment.permalink)}?context=1000)\n\n---\n\n{unsub_group_msg}\n\n{unsub_all_msg}"
