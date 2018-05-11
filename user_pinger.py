@@ -108,7 +108,7 @@ class UserPinger(object):
         stream.close()
         self.logger.debug("Updated wiki page")
         return
-    
+
     def _footer(self, commands: List[Tuple[str, ...]]) -> str:
         return ' | '.join([self._userpinger_github_link()] + [self._command_link(*command) for command in commands])
 
@@ -256,8 +256,8 @@ class UserPinger(object):
             if user.lower() == str(comment.author).lower():
                 continue
             try:
-                unsub_group_msg: str = self._command_link("^^Click ^^here ^^to ^^unsubscribe ^^from ^^{group}", "unsubscribe", "{group}")
-                unsub_all_msg: str = self._command_link("^^Click ^^here ^^to ^^unsubscribe ^^from ^^all ^^groups", "unsubscribe", "")
+                unsub_group_msg: str = self._command_link("^^Click ^^here ^^to ^^unsubscribe ^^from ^^{group}", "Unsubscribe from {group}", "unsubscribe {group}")
+                unsub_all_msg: str = self._command_link("^^Click ^^here ^^to ^^unsubscribe ^^from ^^all ^^groups", "Unsubscribe from all groups", "unsubscribe")
                 self.reddit.redditor(user).message(
                     subject=f"You've been pinged by /u/{comment.author} in group {group}",
                     message=f"[Click here to view the comment](https://www.reddit.com{str(comment.permalink)}?context=1000)\n\n---\n\n{unsub_group_msg}\n\n{unsub_all_msg}"
@@ -319,8 +319,7 @@ class UserPinger(object):
             Gets all avaliable commands to the user
 
             Usage:
-            subject = help
-            body = [anything]
+            body = help
             """
             self.logger.debug("Setting appropriate commands")
             if mod:
@@ -343,9 +342,8 @@ class UserPinger(object):
             """
             Adds member to a Group
 
-            Usage: 
-            subject = addtogroup
-            body = [group you want to be added to]
+            Usage:
+            body = addtogroup [group you want to be added to]
             """
             self.logger.debug("Getting groups")
             groups: ConfigParser = self._get_wiki_page(["config", "groups"])
@@ -377,9 +375,8 @@ class UserPinger(object):
             """
             Removes member from a Group
 
-            Usage: 
-            subject = removefromgroup
-            body = [group you want to be removed from]
+            Usage:
+            body = removefromgroup [group you want to be removed from]
             """
             self.logger.debug("Getting groups")
             groups: ConfigParser = self._get_wiki_page(["config", "groups"])
@@ -410,17 +407,16 @@ class UserPinger(object):
             Removes a user from all Groups
 
             Usage:
-            subject = unsubscribe
-            body = group_name, ""
+            body = unsubscribe [group_name]
             """
             self.logger.debug("Getting groups")
             groups: ConfigParser = self._get_wiki_page(["config", "groups"])
             self.logger.debug("Got groups")
 
             for (group_name, username) in groups.items():
-                if (body == "" or body == group_name)
+                if (not data or data[0] == group_name):
                     if str(author) == username:
-                        self.logger.debug("Removing {username} from {group_name}")
+                        self.logger.debug(f"Removing {username} from {group_name}")
                         groups.remove_option(group_name, username)
 
             return
@@ -429,9 +425,8 @@ class UserPinger(object):
             """
             Returns a List of all available groups
 
-            Usage: 
-            subject = list
-            body = [anything]
+            Usage:
+            body = list
             """
             self.logger.debug("Getting groups")
             groups: ConfigParser = self._get_wiki_page(["config", "groups"])
@@ -449,8 +444,7 @@ class UserPinger(object):
             Protects a group [mod-only]
 
             Usage:
-            subject = protectgroup
-            body = [group to be protected]
+            body = protectgroup [group to be protected]
             """
             self.logger.debug("Getting groups")
             groups: ConfigParser = self._get_wiki_page(["config", "groups"])
@@ -474,8 +468,7 @@ class UserPinger(object):
             Unprotects a group [mod-only]
 
             Usage:
-            subject = unprotectgroup
-            body = [group to be unprotected]
+            body = unprotectgroup [group to be unprotected]
             """
             self.logger.debug("Getting groups")
             groups: ConfigParser = self._get_wiki_page(["config", "groups"])
@@ -499,8 +492,7 @@ class UserPinger(object):
             Makes group public (if not already) [mod-only]
 
             Usage:
-            subject = makepublicgroup
-            body = [group to be made public]
+            body = makepublicgroup [group to be made public]
             """
             self.logger.debug("Getting groups")
             groups: ConfigParser = self._get_wiki_page(["config", "groups"])
@@ -524,8 +516,7 @@ class UserPinger(object):
             Makes group private (if not already) [mod-only]
 
             Usage:
-            subject = makeprivategroup
-            body = [group to be made private]
+            body = makeprivategroup [group to be made private]
             """
             self.logger.debug("Getting groups")
             groups: ConfigParser = self._get_wiki_page(["config", "groups"])
@@ -549,8 +540,7 @@ class UserPinger(object):
             Creates group (if it doesn't exist) [mod-only]
 
             Usage:
-            subject = creategroup
-            body = [group to create]
+            body = creategroup [group to create]
 
             Note:
             Moderator will be a member of the group
@@ -579,8 +569,7 @@ class UserPinger(object):
             Delete group (if it exists) [mod-only]
 
             Usage:
-            subject = deletegroup
-            body = [group to be made public]
+            body = deletegroup [group to be made public]
             """
             self.logger.debug("Getting groups")
             groups: ConfigParser = self._get_wiki_page(["config", "groups"])
@@ -605,8 +594,7 @@ class UserPinger(object):
             Adds user to group (if it exists) [mod-only]
 
             Usage:
-            subject = addusertogroup
-            body = [group to add to], [user]
+            body = addusertogroup [group to add to], [user]
             """
             return
 
@@ -615,8 +603,7 @@ class UserPinger(object):
             Removes user from group (if it exists) [mod-only]
 
             Usage:
-            subject = removeuserfromgroup
-            body = [group to remove from], [user]
+            body = removeuserfromgroup [group to remove from], [user]
             """
             return
 
