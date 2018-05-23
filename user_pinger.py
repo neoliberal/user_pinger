@@ -292,6 +292,8 @@ class UserPinger(object):
         mod_commands: list = self.config.options("mod_commands")
         all_commands: list = public_commands + mod_commands
 
+        self.logger.debug("All commands: " + str(all_commands))
+
         if command in all_commands:
             self.logger.debug("Checking if command is mod-only by non-moderator")
             is_mod: bool = self.is_moderator(author)
@@ -402,23 +404,26 @@ class UserPinger(object):
 
             return
 
-        def unsubscribe(_, author: praw.models.Redditor) -> None:
+        def unsubscribe(data: str, author: praw.models.Redditor) -> None:
             """
             Removes a user from all Groups
 
             Usage:
             body = unsubscribe [group_name]
             """
+            data = data.upper()
+            unsub_groups: List[str] = data.split()
+            self.logger.debug(f"Processing unsubscribe {str(author)} from {str(unsub_groups)}")
             self.logger.debug("Getting groups")
             groups: ConfigParser = self._get_wiki_page(["config", "groups"])
             self.logger.debug("Got groups")
-
-            for (group_name, username) in groups.items():
-                if (not data or data[0] == group_name):
-                    if str(author) == username:
-                        self.logger.debug(f"Removing {username} from {group_name}")
-                        groups.remove_option(group_name, username)
-
+            for (group_name, usernames) in groups.items():
+                for username in usernames.items():
+                    username = str(username[0]).upper()
+                    if (not unsub_groups or group_name in unsub_groups):
+                        if str(author).upper() == username.upper():
+                            self.logger.debug(f"Removing {username} from {group_name}")
+                            remove_from_group(group_name, author)
             return
 
         def list_groups(_, author: praw.models.Redditor) -> None:
