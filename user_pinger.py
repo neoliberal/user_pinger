@@ -115,8 +115,9 @@ class UserPinger(object):
     def _userpinger_github_link(self) -> str:
         return "[user_pinger](https://github.com/neoliberal/user_pinger)"
 
-    def _command_link(self, name: str, subject: str, body: str) -> str:
-        return f"[{name}](https://reddit.com/message/compose?to={str(self.reddit.user.me())}&subject={subject}&message={body})"
+    def _command_link(self, name: str, header: str, action: str, data: str) -> str:
+        command: str = f"{action} {data}"
+        return f"[{name}](https://reddit.com/message/compose?to={str(self.reddit.user.me())}&subject={header}&message={command})"
 
     def _send_pm(self, subject: str, body: List[str], author: praw.models.Redditor) -> None:
         """sends PM"""
@@ -132,7 +133,7 @@ class UserPinger(object):
     def listen(self) -> None:
         """lists to subreddit's comments for pings"""
         import prawcore
-        from time import sleep
+        from time import sleep, time
         try:
             for comment in self.subreddit.stream.comments(pause_after=1):
                 if comment is None:
@@ -226,7 +227,7 @@ class UserPinger(object):
         self.logger.debug("Checking if author is in group or group is public")
         if not (self.in_group(comment.author, users) or self.public_group(group) or self.is_moderator(comment.author)):
             self.logger.warning("Non-member %s tried to ping \"%s\" group", comment.author, group)
-            self._send_error_pm(f"Cannot ping Group {group}", [f"You need to be a member of {group} to ping it"], comment.author)
+            self._send_error_pm(f"Cannot ping Group {group}", [f"You need to be a member of {group} to ping it", self._command_link(f"Click here, then click \"send\" to join {group}", f"Join {group}", "addtogroup", f"{group}") ], comment.author)
             return
         self.logger.debug("Checked that author is in group")
 
@@ -242,7 +243,10 @@ class UserPinger(object):
 
         def edit_comment(posted: praw.models.Comment) -> None:
             """edits comment to reflect all users pinged"""
-            body: str = "\n\n".join([f"Pinged members of {group} group.", "---", self._footer([("Request to be added to this group", "addtogroup", group)])])
+            body: str = "\n\n".join([f"Pinged members of {group} group.", "---",
+                self._footer([("Request to be added to this group", f"Add yourself to group {group}", "addtogroup", f"{group}"),
+                              ("Unsubscribe from this group", f"Unsubscribe from group {group}", "unsubscribe", f"{group}"),
+                              ("Unsubscribe from all pings", f"Unsubscribe from all groups", "unsubscribe", "")])])
             posted.edit(body)
 
         self.logger.debug("Pinging group")
@@ -256,8 +260,8 @@ class UserPinger(object):
             if user.lower() == str(comment.author).lower():
                 continue
             try:
-                unsub_group_msg: str = self._command_link(f"^^Click ^^here ^^to ^^unsubscribe ^^from ^^{group}", f"Unsubscribe from {group}", f"unsubscribe {group}")
-                unsub_all_msg: str = self._command_link(f"^^Click ^^here ^^to ^^unsubscribe ^^from ^^all ^^groups", "Unsubscribe from all groups", "unsubscribe")
+                unsub_group_msg: str = self._command_link(f"^Click ^here ^to ^unsubscribe ^from ^{group}", f"Unsubscribe from group {group}", "unsubscribe", f"{group}")
+                unsub_all_msg: str = self._command_link(f"^Reply ^\"unsubscribe\" ^to ^stop ^receiving ^these ^messages", "Unsubscribe from all groups", "unsubscribe", "")
                 self.reddit.redditor(user).message(
                     subject=f"You've been pinged by /u/{comment.author} in group {group}",
                     message=f"[Click here to view the comment](https://www.reddit.com{str(comment.permalink)}?context=1000)\n\n---\n\n{unsub_group_msg}\n\n{unsub_all_msg}"
@@ -353,8 +357,8 @@ class UserPinger(object):
 
             self.logger.debug("Checking if group exists")
             if self.group_exists(body, groups) is False:
-                self.logger.warning(f"Add group request {body} by {author} is invalid")
-                self._send_error_pm("Invalid add group request", [f"Your add group request {body} is invalid"], author)
+                self.logger.warning(f"Add group request {body} by {author} is invalid (does not exist)")
+                self._send_error_pm("Invalid add group request", [f"The group \"{body}\" does not exist"], author)
                 return
             self.logger.debug("Group exists")
 
@@ -637,3 +641,4 @@ class UserPinger(object):
             public_commands[command](data, author)
 
         return
+
