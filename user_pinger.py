@@ -131,7 +131,7 @@ class UserPinger(object):
         self._send_pm(f"Userpinger Error: {subject}", body, author)
 
     def listen(self) -> None:
-        """lists to subreddit's comments for pings"""
+        """listens to subreddit's comments for pings"""
         import prawcore
         from time import sleep, time
         try:
@@ -227,7 +227,11 @@ class UserPinger(object):
         self.logger.debug("Checking if author is in group or group is public")
         if not (self.in_group(comment.author, users) or self.public_group(group) or self.is_moderator(comment.author)):
             self.logger.warning("Non-member %s tried to ping \"%s\" group", comment.author, group)
-            self._send_error_pm(f"Cannot ping Group {group}", [f"You need to be a member of {group} to ping it", self._command_link(f"Click here, then click \"send\" to join {group}", f"Join {group}", "addtogroup", f"{group}") ], comment.author)
+            self._send_error_pm(f"Cannot ping Group {group}", [f"You need to be a member of {group} to ping it",
+                                                               self._command_link(
+                                                                   f"Click here, then click \"send\" to join {group}",
+                                                                   f"Join {group}", "addtogroup", f"{group}")],
+                                comment.author)
             return
         self.logger.debug("Checked that author is in group")
 
@@ -244,9 +248,12 @@ class UserPinger(object):
         def edit_comment(posted: praw.models.Comment) -> None:
             """edits comment to reflect all users pinged"""
             body: str = "\n\n".join([f"Pinged members of {group} group.", "---",
-                self._footer([("Request to be added to this group", f"Add yourself to group {group}", "addtogroup", f"{group}"),
-                              ("Unsubscribe from this group", f"Unsubscribe from group {group}", "unsubscribe", f"{group}"),
-                              ("Unsubscribe from all pings", f"Unsubscribe from all groups", "unsubscribe", "")])])
+                                     self._footer([("Request to be added to this group",
+                                                    f"Add yourself to group {group}", "addtogroup", f"{group}"),
+                                                   ("Unsubscribe from this group", f"Unsubscribe from group {group}",
+                                                    "unsubscribe", f"{group}"),
+                                                   ("Unsubscribe from all pings", f"Unsubscribe from all groups",
+                                                    "unsubscribe", "")])])
             posted.edit(body)
 
         self.logger.debug("Pinging group")
@@ -260,8 +267,11 @@ class UserPinger(object):
             if user.lower() == str(comment.author).lower():
                 continue
             try:
-                unsub_group_msg: str = self._command_link(f"^Click ^here ^to ^unsubscribe ^from ^{group}", f"Unsubscribe from group {group}", "unsubscribe", f"{group}")
-                unsub_all_msg: str = self._command_link(f"^Reply ^\"unsubscribe\" ^to ^stop ^receiving ^these ^messages", "Unsubscribe from all groups", "unsubscribe", "")
+                unsub_group_msg: str = self._command_link(f"^Click ^here ^to ^unsubscribe ^from ^{group}",
+                                                          f"Unsubscribe from group {group}", "unsubscribe", f"{group}")
+                unsub_all_msg: str = self._command_link(
+                    f"^Reply ^\"unsubscribe\" ^to ^stop ^receiving ^these ^messages", "Unsubscribe from all groups",
+                    "unsubscribe", "")
                 self.reddit.redditor(user).message(
                     subject=f"You've been pinged by /u/{comment.author} in group {group}",
                     message=f"[Click here to view the comment](https://www.reddit.com{str(comment.permalink)}?context=1000)\n\n---\n\n{unsub_group_msg}\n\n{unsub_all_msg}"
@@ -313,12 +323,12 @@ class UserPinger(object):
 
         return
 
-    def run_command (
-        self,
-        author: praw.models.Redditor,
-        mod: bool,
-        command: str, # Command heading (formerly the subject)
-        data: str # Command data (group, etc)
+    def run_command(
+            self,
+            author: praw.models.Redditor,
+            mod: bool,
+            command: str,  # Command heading (formerly the subject)
+            data: str  # Command data (group, etc)
     ) -> None:
         def help_command(_, author: praw.models.Redditor) -> None:
             """
@@ -365,7 +375,8 @@ class UserPinger(object):
             self.logger.debug("Checking if group is protected")
             if self.protected_group(body):
                 self.logger.warning("%s tried to add themselves to protected group \"%s\"", author, body)
-                self._send_error_pm("Attempted to add to protected group", [f"You attempted to add yourself to protected group {body}."], author)
+                self._send_error_pm("Attempted to add to protected group",
+                                    [f"You attempted to add yourself to protected group {body}."], author)
                 return
             self.logger.debug("Group is not protected")
 
@@ -391,7 +402,9 @@ class UserPinger(object):
             self.logger.debug("Checking if group exists")
             if self.group_exists(body, groups) is None:
                 self.logger.warning(f"Remove group request {body} by {author} is invalid")
-                self._send_error_pm(f"Group {body} does not exist", [f"You attempted to remove yourself from group {body} which does not exist"], author)
+                self._send_error_pm(f"Group {body} does not exist",
+                                    [f"You attempted to remove yourself from group {body} which does not exist"],
+                                    author)
                 return
             self.logger.debug("Group exists")
 
@@ -400,10 +413,13 @@ class UserPinger(object):
 
             if result is False:
                 self.logger.warning("Remove group request is invalid")
-                self._send_error_pm(f"Cannot remove non-member from {body}", [f"You could not be removed from group {body} because you are not a member"], author)
+                self._send_error_pm(f"Cannot remove non-member from {body}",
+                                    [f"You could not be removed from group {body} because you are not a member"],
+                                    author)
             else:
                 self.logger.debug("Removed from group")
-                self._send_pm(f"Removed from Group {body.upper()}", [f"You were removed from group {body.upper()}"], author)
+                self._send_pm(f"Removed from Group {body.upper()}", [f"You were removed from group {body.upper()}"],
+                              author)
                 self._update_wiki_page(["config", "groups"], groups, message=f"Removed /u/{author} from Group {body}")
 
             return
@@ -446,6 +462,32 @@ class UserPinger(object):
             self.logger.debug("Joined groups")
 
             self._send_pm("Avaliable Groups", [groups_list], author)
+            return
+
+        def list_my_groups(_, author: praw.models.Redditor) -> None:
+            """
+            Returns all the groups the user is a part of
+
+            Usage:
+            body = listmygroups
+            """
+            self.logger.debug("Getting groups")
+            groups: ConfigParser = self._get_wiki_page(["config", "groups"])
+            self.logger.debug("Got groups")
+
+            self.logger.debug("Getting User's groups")
+            myGroups = []
+
+            for (group_name, usernames) in groups.items():
+                for username in usernames.items():
+                    username = str(username[0]).upper()
+                    if str(author).upper() == username.upper():
+                        myGroups.append(group_name);
+
+            groups_list = ', '.join(myGroups)
+            self.logger.debug("Found User's groups")
+
+            self._send_pm("Groups you are in", [groups_list], author)
             return
 
         def protect_group(body: str, author: praw.models.Redditor) -> None:
@@ -617,23 +659,24 @@ class UserPinger(object):
             return
 
         public_commands: Dict[str, Callable[[str, praw.models.Redditor], None]] = {
-                "help": help_command,
-                "addtogroup": add_to_group,
-                "removefromgroup": remove_from_group,
-                "unsubscribe": unsubscribe,
-                "list": list_groups
-            }
+            "help": help_command,
+            "addtogroup": add_to_group,
+            "removefromgroup": remove_from_group,
+            "unsubscribe": unsubscribe,
+            "list": list_groups,
+            "listmygroup": list_my_groups
+        }
 
         mod_commands: Dict[str, Callable[[str, praw.models.Redditor], None]] = {
-                "protectgroup": protect_group,
-                "unprotectgroup": unprotect_group,
-                "makepublicgroup": make_public_group,
-                "makeprivategroup": make_private_group,
-                "creategroup": create_group,
-                "deletegroup": delete_group,
-                "addusertogroup": add_user_to_group,
-                "removeuserfromgroup": remove_user_from_group,
-            }
+            "protectgroup": protect_group,
+            "unprotectgroup": unprotect_group,
+            "makepublicgroup": make_public_group,
+            "makeprivategroup": make_private_group,
+            "creategroup": create_group,
+            "deletegroup": delete_group,
+            "addusertogroup": add_user_to_group,
+            "removeuserfromgroup": remove_user_from_group,
+        }
 
         if mod:
             {**public_commands, **mod_commands}[command](data, author)
@@ -641,4 +684,3 @@ class UserPinger(object):
             public_commands[command](data, author)
 
         return
-
