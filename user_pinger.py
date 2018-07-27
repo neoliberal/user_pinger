@@ -594,7 +594,7 @@ class UserPinger(object):
             groups.remove_section(body.upper())
             self.logger.debug("Removed group")
 
-            self._send_pm(f"Removed Group {body.upper}", ["Group removed"], author)
+            self._send_pm(f"Removed Group {body.upper()}", ["Group removed"], author)
             self._update_wiki_page(["config", "groups"], groups, f"Removed Group {body.upper()}")
             return
 
