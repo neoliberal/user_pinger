@@ -252,7 +252,11 @@ class UserPinger(object):
         self.logger.debug("Pinging group")
 
         self.logger.debug("Posting comment")
-        posted_comment: praw.models.Comment = post_comment()
+        try:
+            posted_comment: praw.models.Comment = post_comment()
+        except praw.exceptions.APIException:
+            self.logger.debug("Original ping comment was deleted. Exiting.")
+            return
         self.logger.debug("Posted comment")
 
         self.logger.debug("Pinging individual users")
