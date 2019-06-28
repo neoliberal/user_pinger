@@ -378,7 +378,9 @@ class UserPinger(object):
             self.logger.debug("Added successfully")
 
             self._send_pm(f"Added to Group {body.upper()}", [f"You were added to group {body.upper()}"], author)
-            self._update_wiki_page(["config", "groups"], groups, f"Added /u/{author} to Group {body.upper()}")
+            # Revision reasons cannot contain emojis. This works around that.
+            revision_reason = body.upper().replace('🔮', '[Crystal Ball]').encode('ascii', 'ignore').decode('utf-8')
+            self._update_wiki_page(["config", "groups"], groups, f"Added /u/{author} to Group {revision_reason}")
             return
 
         def remove_from_group(body: str, author: praw.models.Redditor) -> None:
@@ -408,7 +410,9 @@ class UserPinger(object):
             else:
                 self.logger.debug("Removed from group")
                 self._send_pm(f"Removed from Group {body.upper()}", [f"You were removed from group {body.upper()}"], author)
-                self._update_wiki_page(["config", "groups"], groups, message=f"Removed /u/{author} from Group {body}")
+                # Revision reasons cannot contain emojis. This works around that.
+                revision_reason = body.upper().replace('🔮', '[Crystal Ball]').encode('ascii', 'ignore').decode('utf-8')
+                self._update_wiki_page(["config", "groups"], groups, message=f"Removed /u/{author} from Group {revision_reason}")
 
             return
 
