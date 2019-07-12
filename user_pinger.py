@@ -148,6 +148,7 @@ class UserPinger(object):
                         continue
                     self.handle_command(message)
                     message.mark_read()
+            self.save()
         except prawcore.exceptions.ServerError:
             self.logger.error("Server error: Sleeping for 1 minute.")
             sleep(60)
