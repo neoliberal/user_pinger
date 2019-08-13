@@ -220,7 +220,7 @@ class UserPinger(object):
 
         if self.group_exists(group, groups) is False:
             self.logger.warning("Group \"%s\" by %s does not exist", group, comment.author)
-            self._send_pm("Invalid Ping", [f"You pinged group {group} that does not exist"], comment.author)
+            self._send_pm("Invalid Ping", [f"You pinged group {group} that does not exist. Please see our list of groups [here](https://reddit.com/r/neoliberal/wiki/userpinger/groups)."], comment.author)
             return
         users: Optional[List[str]] = self.get_group_members(group, groups)
         self.logger.debug("Got users in group")
