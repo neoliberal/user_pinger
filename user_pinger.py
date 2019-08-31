@@ -2,6 +2,7 @@
 from configparser import ConfigParser, ParsingError, NoSectionError
 import pickle
 import logging
+import re
 import signal
 from typing import Deque, List, Optional, Callable, Dict, Tuple
 
@@ -403,12 +404,15 @@ class UserPinger(object):
             self.logger.debug("Group exists")
 
             self.logger.debug("Removing %s from group %s", author, body)
-            result: bool = groups.remove_option(body.upper(), str(author))
+            regex = re.compile(str(author), flags=re.IGNORECASE)
+            matches = list(filter(regex.match, groups.options(body.upper())))
 
-            if result is False:
+            if not matches:
                 self.logger.warning("Remove group request is invalid")
                 self._send_error_pm(f"Cannot remove non-member from {body}", [f"You could not be removed from group {body} because you are not a member"], author)
             else:
+                for match in matches:
+                    groups.remove_option(body.upper(), match)
                 self.logger.debug("Removed from group")
                 self._send_pm(f"Removed from Group {body.upper()}", [f"You were removed from group {body.upper()}"], author)
                 # Revision reasons cannot contain emojis. This works around that.
@@ -437,6 +441,7 @@ class UserPinger(object):
                         if str(author).upper() == username.upper():
                             self.logger.debug(f"Removing {username} from {group_name}")
                             remove_from_group(group_name, author)
+                            break # Don't try to remove the same user multiple times
             return
 
         def list_groups(_, author: praw.models.Redditor) -> None:
