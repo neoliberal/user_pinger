@@ -3,10 +3,7 @@ import os
 
 import praw
 
-try:
-    from user_pinger import UserPinger
-except ModuleNotFoundError:
-    from .user_pinger import UserPinger
+from user_pinger import UserPinger
 
 def main() -> None:
     """main service function"""
