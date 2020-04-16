@@ -1,0 +1,2 @@
+praw==6.5.1
+git+https://github.com/neoliberal/slack_python_logging

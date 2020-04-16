@@ -139,6 +139,9 @@ class UserPinger(object):
             for comment in self.subreddit.stream.comments(pause_after=1):
                 if comment is None:
                     break
+                if comment.banned_by is not None:
+                    # Don't trigger on removed comments
+                    continue
                 if str(comment) in self.parsed:
                     continue
                 self.handle_comment(comment)
@@ -149,7 +152,6 @@ class UserPinger(object):
                         continue
                     self.handle_command(message)
                     message.mark_read()
-            self.save()
         except prawcore.exceptions.ServerError:
             self.logger.error("Server error: Sleeping for 1 minute.")
             sleep(60)
