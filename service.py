@@ -12,7 +12,7 @@ def main() -> None:
         client_id=os.environ["userpinger_client_id"],
         client_secret=os.environ["userpinger_client_secret"],
         refresh_token=os.environ["userpinger_refresh_token"],
-        user_agent="linux:userpinger:v1.0 (by /r/Neoliberal)"
+        user_agent="linux:userpinger:v1.1 (by /r/Neoliberal)"
     )
 
     bot: UserPinger = UserPinger(
