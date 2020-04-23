@@ -1,18 +1,20 @@
 """main class"""
 from configparser import ConfigParser, ParsingError, NoSectionError
-import pickle
 import logging
+import pickle
 import re
 import signal
+from time import sleep, time
 from typing import Deque, List, Optional, Callable, Dict, Tuple
 
 import praw
+
 from slack_python_logging import slack_logger
 
 
 class UserPinger(object):
     """pings users"""
-    __slots__ = ["reddit", "subreddit", "config", "logger", "parsed"]
+    __slots__ = ["reddit", "subreddit", "config", "logger", "parsed", "start_time"]
 
     def __init__(self, reddit: praw.Reddit, subreddit: str) -> None:
         """initialize"""
@@ -28,6 +30,7 @@ class UserPinger(object):
             subreddit)
         self.config: ConfigParser = self._get_wiki_page(["config"])
         self.parsed: Deque[str] = self.load()
+        self.start_time: float = time()
         register_signals()
         self.logger.info("Successfully initialized")
 
@@ -134,13 +137,15 @@ class UserPinger(object):
     def listen(self) -> None:
         """lists to subreddit's comments for pings"""
         import prawcore
-        from time import sleep, time
         try:
             for comment in self.subreddit.stream.comments(pause_after=1):
                 if comment is None:
                     break
                 if comment.banned_by is not None:
                     # Don't trigger on removed comments
+                    continue
+                if comment.created_utc < self.start_time:
+                    # Don't trigger on comments posted prior to startup
                     continue
                 if str(comment) in self.parsed:
                     continue
@@ -248,9 +253,9 @@ class UserPinger(object):
         def edit_comment(posted: praw.models.Comment) -> None:
             """edits comment to reflect all users pinged"""
             body: str = "\n\n".join([f"Pinged members of {group} group.", "---",
-                self._footer([("Request to be added to this group", f"Add yourself to group {group}", "addtogroup", f"{group}"),
+                self._footer([("Subscribe to this group", f"Add yourself to group {group}", "addtogroup", f"{group}"),
                               ("Unsubscribe from this group", f"Unsubscribe from group {group}", "unsubscribe", f"{group}"),
-                              ("Unsubscribe from all pings", f"Unsubscribe from all groups", "unsubscribe", "")])])
+                              ("Unsubscribe from all groups", f"Unsubscribe from all groups", "unsubscribe", "")])])
             posted.edit(body)
 
         self.logger.debug("Pinging group")
