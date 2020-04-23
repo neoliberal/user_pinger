@@ -253,9 +253,9 @@ class UserPinger(object):
         def edit_comment(posted: praw.models.Comment) -> None:
             """edits comment to reflect all users pinged"""
             body: str = "\n\n".join([f"Pinged members of {group} group.", "---",
-                self._footer([("Request to be added to this group", f"Add yourself to group {group}", "addtogroup", f"{group}"),
+                self._footer([("Subscribe to this group", f"Add yourself to group {group}", "addtogroup", f"{group}"),
                               ("Unsubscribe from this group", f"Unsubscribe from group {group}", "unsubscribe", f"{group}"),
-                              ("Unsubscribe from all pings", f"Unsubscribe from all groups", "unsubscribe", "")])])
+                              ("Unsubscribe from all groups", f"Unsubscribe from all groups", "unsubscribe", "")])])
             posted.edit(body)
 
         self.logger.debug("Pinging group")
