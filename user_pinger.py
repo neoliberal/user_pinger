@@ -14,7 +14,9 @@ from slack_python_logging import slack_logger
 
 class UserPinger(object):
     """pings users"""
-    __slots__ = ["reddit", "subreddit", "config", "logger", "parsed", "start_time"]
+    __slots__ = [
+        "reddit", "primary_subreddit", "subreddits", "config", "logger", "parsed", "start_time"
+    ]
 
     def __init__(self, reddit: praw.Reddit, subreddit: str) -> None:
         """initialize"""
@@ -26,8 +28,12 @@ class UserPinger(object):
         self.logger: logging.Logger = slack_logger.initialize("user_pinger")
         self.logger.debug("Initializing")
         self.reddit: praw.Reddit = reddit
-        self.subreddit: praw.models.Subreddit = self.reddit.subreddit(
-            subreddit)
+        self.primary_subreddit: praw.models.Subreddit = self.reddit.subreddit(
+            subreddit.split("+")[0]
+        )
+        self.subreddits: praw.models.Subreddit = self.reddit.subreddit(
+            subreddit
+        )
         self.config: ConfigParser = self._get_wiki_page(["config"])
         self.parsed: Deque[str] = self.load()
         self.start_time: float = time()
@@ -88,7 +94,7 @@ class UserPinger(object):
         combined_page: str = self._make_userpinger_wiki_page(page)
         import prawcore
         try:
-            groups.read_string(self.subreddit.wiki[combined_page].content_md)
+            groups.read_string(self.primary_subreddit.wiki[combined_page].content_md)
         except prawcore.exceptions.NotFound:
             self.logger.error("Could not find groups")
             raise
@@ -108,16 +114,16 @@ class UserPinger(object):
         stream: io.StringIO = io.StringIO()
         config.write(stream)
         combined_page: str = self._make_userpinger_wiki_page(page)
-        self.subreddit.wiki[combined_page].edit(stream.getvalue(), reason=message)
+        self.primary_subreddit.wiki[combined_page].edit(stream.getvalue(), reason=message)
         stream.close()
         self.logger.debug("Updated wiki page")
         return
 
     def _footer(self, commands: List[Tuple[str, ...]]) -> str:
-        return ' | '.join([self._userpinger_github_link()] + [self._command_link(*command) for command in commands])
+        return ' | '.join([self._userpinger_documentation_link()] + [self._command_link(*command) for command in commands])
 
-    def _userpinger_github_link(self) -> str:
-        return "[user_pinger](https://github.com/neoliberal/user_pinger)"
+    def _userpinger_documentation_link(self) -> str:
+        return f"[About](https://reddit.com/r/{self.primary_subreddit.display_name}/wiki/userpinger/documentation)"
 
     def _command_link(self, name: str, header: str, action: str, data: str) -> str:
         command: str = f"{action} {data}"
@@ -138,7 +144,7 @@ class UserPinger(object):
         """lists to subreddit's comments for pings"""
         import prawcore
         try:
-            for comment in self.subreddit.stream.comments(pause_after=1):
+            for comment in self.subreddits.stream.comments(pause_after=1):
                 if comment is None:
                     break
                 if comment.banned_by is not None:
@@ -189,7 +195,7 @@ class UserPinger(object):
 
     def is_moderator(self, author: praw.models.Subreddit) -> bool:
         """checks if author is a moderator"""
-        return author in self.subreddit.moderator()
+        return author in self.primary_subreddit.moderator()
 
     def handle_comment(self, comment: praw.models.Comment) -> None:
         """handles ping"""
