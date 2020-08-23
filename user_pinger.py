@@ -19,6 +19,8 @@ class UserPinger(object):
     __slots__ = [
         "reddit", "primary_subreddit", "subreddits", "config", "logger", "parsed", "start_time"
     ]
+    # Group names must be ASCII upper case separated by '-'
+    GROUP_ALLOWED_CHARS = string.ascii_uppercase + '-'
     # Punctuation that we can strip (leading/trailing) safely when parsing a ping
     GROUP_STRIP_PUNCT = string.punctuation.replace('-', '')
 
@@ -84,6 +86,12 @@ class UserPinger(object):
             self.logger.debug("Saved file")
             return
         return
+
+    def _validate_group_name(self, group_name: str) -> Tuple[bool, str]:
+        if set(group_name) - set(self.GROUP_ALLOWED_CHARS):
+            msg = f"Group name {group_name} must only use {self.GROUP_ALLOWED_CHARS}"
+            return False, msg
+        return True, None
 
     def _make_userpinger_wiki_page(self, page: Optional[List[str]] = None) -> str:
         """takes a list of pages and returns a completed one"""
@@ -223,6 +231,12 @@ class UserPinger(object):
         # Strip punctuation like:
         # !ping WEEBS, what do you folks think of this?
         trigger: str = token.strip(self.GROUP_STRIP_PUNCT)
+
+        # Validate group name to save having to look up invalid names
+        ret: bool, msg: Optional[str] = self._validate_group_name(trigger)
+        if not ret:
+            self.logger.debug(msg)
+            return
 
         self.logger.debug("Pinging group %s", trigger)
         self.handle_ping(trigger, comment)
@@ -590,6 +604,13 @@ class UserPinger(object):
             Note:
             Moderator will be a member of the group
             """
+            group_name: str = body.upper()
+            ret: bool, msg: Optional[str] = self._validate_group_name(group_name)
+            if not ret:
+                self.logger.warning(msg)
+                self._send_pm("Cannot create group", [msg], author)
+                return
+
             self.logger.debug("Getting groups")
             groups: ConfigParser = self._get_wiki_page(["config", "groups"])
             self.logger.debug("Got groups")
@@ -600,13 +621,13 @@ class UserPinger(object):
                 return
             self.logger.debug("Group does not exist")
 
-            self.logger.debug("Creating group %s", body.upper())
-            groups.add_section(body.upper())
-            groups.set(body.upper(), str(author), None)
+            self.logger.debug("Creating group %s", group_name)
+            groups.add_section(group_name)
+            groups.set(group_name, str(author), None)
             self.logger.debug("Created group")
 
-            self._send_pm(f"Created Group {body.upper()}", ["Group created"], author)
-            self._update_wiki_page(["config", "groups"], groups, f"Created new Group {body.upper()}")
+            self._send_pm(f"Created Group {group_name}", ["Group created"], author)
+            self._update_wiki_page(["config", "groups"], groups, f"Created new Group {group_name}")
             return
 
         def delete_group(body: str, author: praw.models.Redditor) -> None:
