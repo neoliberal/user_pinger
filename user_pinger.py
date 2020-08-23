@@ -3,6 +3,7 @@ from configparser import ConfigParser, ParsingError, NoSectionError
 import logging
 import pickle
 import re
+import string
 import signal
 from urllib.parse import quote
 from time import sleep, time
@@ -18,6 +19,9 @@ class UserPinger(object):
     __slots__ = [
         "reddit", "primary_subreddit", "subreddits", "config", "logger", "parsed", "start_time"
     ]
+    # Punctuation that we can strip (leading/trailing) safely when parsing a ping
+    GROUP_STRIP_PUNCT = string.punctuation.replace('-', '')
+
 
     def __init__(self, reddit: praw.Reddit, subreddit: str) -> None:
         """initialize"""
@@ -210,11 +214,17 @@ class UserPinger(object):
             return
         self.logger.debug("Ping found in %s", str(comment))
         try:
-            trigger: str = split[index + 1]
+            token: str = split[index + 1]
         except IndexError:
             self.logger.debug("End of comment with no group specified")
             return
-        self.logger.debug("Found group is %s", trigger)
+        self.logger.debug("Comment contained group token %s", token)
+
+        # Strip punctuation like:
+        # !ping WEEBS, what do you folks think of this?
+        trigger: str = token.strip(self.GROUP_STRIP_PUNCT)
+
+        self.logger.debug("Pinging group %s", trigger)
         self.handle_ping(trigger, comment)
 
     def handle_ping(self, group: str, comment: praw.models.Comment) -> None:
