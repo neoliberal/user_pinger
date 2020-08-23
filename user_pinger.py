@@ -590,7 +590,7 @@ class UserPinger(object):
             if self.group_exists(body, groups) is True:
                 self.logger.warning("Attempted to make group that already exists")
                 return
-            self.logger.debug("Group exists")
+            self.logger.debug("Group does not exist")
 
             self.logger.debug("Creating group %s", body.upper())
             groups.add_section(body.upper())
