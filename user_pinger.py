@@ -208,16 +208,14 @@ class UserPinger(object):
         except ValueError:
             # no trigger
             return
-        else:
-            self.logger.debug("Ping found in %s", str(comment))
-            try:
-                trigger: str = split[index + 1]
-            except IndexError:
-                self.logger.debug("End of comment with no group specified")
-                return
-            else:
-                self.logger.debug("Found group is %s", trigger)
-                self.handle_ping(trigger, comment)
+        self.logger.debug("Ping found in %s", str(comment))
+        try:
+            trigger: str = split[index + 1]
+        except IndexError:
+            self.logger.debug("End of comment with no group specified")
+            return
+        self.logger.debug("Found group is %s", trigger)
+        self.handle_ping(trigger, comment)
 
     def handle_ping(self, group: str, comment: praw.models.Comment) -> None:
         """handles ping"""
