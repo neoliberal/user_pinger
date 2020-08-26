@@ -4,6 +4,7 @@ import logging
 import pickle
 import re
 import signal
+from urllib.parse import quote
 from time import sleep, time
 from typing import Deque, List, Optional, Callable, Dict, Tuple
 
@@ -127,7 +128,7 @@ class UserPinger(object):
 
     def _command_link(self, name: str, header: str, action: str, data: str) -> str:
         command: str = f"{action} {data}"
-        return f"[{name}](https://reddit.com/message/compose?to={str(self.reddit.user.me())}&subject={header}&message={command})"
+        return f"[{name}](https://reddit.com/message/compose?to={str(self.reddit.user.me())}&subject={quote(header)}&message={quote(command)})"
 
     def _send_pm(self, subject: str, body: List[str], author: praw.models.Redditor) -> None:
         """sends PM"""
