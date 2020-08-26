@@ -124,7 +124,7 @@ class UserPinger(object):
         return ' | '.join([self._userpinger_documentation_link()] + [self._command_link(*command) for command in commands])
 
     def _userpinger_documentation_link(self) -> str:
-        return f"[About](https://reddit.com/r/{self.primary_subreddit.display_name}/wiki/userpinger/documentation)"
+        return f"[About & group list](https://reddit.com/r/{self.primary_subreddit.display_name}/wiki/userpinger/documentation)"
 
     def _command_link(self, name: str, header: str, action: str, data: str) -> str:
         command: str = f"{action} {data}"
@@ -259,7 +259,7 @@ class UserPinger(object):
 
         def edit_comment(posted: praw.models.Comment) -> None:
             """edits comment to reflect all users pinged"""
-            body: str = "\n\n".join([f"Pinged members of {group} group.", "---",
+            body: str = "\n\n".join([f"Pinged members of {group} group.",
                 self._footer([("Subscribe to this group", f"Add yourself to group {group}", "addtogroup", f"{group}"),
                               ("Unsubscribe from this group", f"Unsubscribe from group {group}", "unsubscribe", f"{group}"),
                               ("Unsubscribe from all groups", f"Unsubscribe from all groups", "unsubscribe", "")])])
