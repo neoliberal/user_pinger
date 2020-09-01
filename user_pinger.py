@@ -233,7 +233,9 @@ class UserPinger(object):
         trigger: str = token.strip(self.GROUP_STRIP_PUNCT)
 
         # Validate group name to save having to look up invalid names
-        ret: bool, msg: Optional[str] = self._validate_group_name(trigger)
+        ret: bool
+        msg: Optional[str]
+        ret, msg = self._validate_group_name(trigger)
         if not ret:
             self.logger.debug(msg)
             return
@@ -698,4 +700,3 @@ class UserPinger(object):
             public_commands[command](data, author)
 
         return
-
