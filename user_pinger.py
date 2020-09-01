@@ -238,6 +238,7 @@ class UserPinger(object):
         ret, msg = self._validate_group_name(trigger)
         if not ret:
             self.logger.debug(msg)
+            self._send_error_pm(f"Invalid group name", [f"The group name {trigger} contains invalid characters"], comment.author)
             return
 
         self.logger.debug("Pinging group %s", trigger)
