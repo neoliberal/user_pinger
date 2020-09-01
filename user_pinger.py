@@ -607,7 +607,9 @@ class UserPinger(object):
             Moderator will be a member of the group
             """
             group_name: str = body.upper()
-            ret: bool, msg: Optional[str] = self._validate_group_name(group_name)
+            ret: bool
+            msg: Optional[str]
+            ret, msg = self._validate_group_name(group_name)
             if not ret:
                 self.logger.warning(msg)
                 self._send_pm("Cannot create group", [msg], author)
