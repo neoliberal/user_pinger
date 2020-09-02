@@ -20,7 +20,7 @@ class UserPinger(object):
         "reddit", "primary_subreddit", "subreddits", "config", "logger", "parsed", "start_time"
     ]
     # Group names must be ASCII upper case separated by '-'
-    GROUP_ALLOWED_CHARS = string.ascii_uppercase + '-'
+    GROUP_ALLOWED_CHARS = string.ascii_uppercase + string.digits + '-'
     # Punctuation that we can strip (leading/trailing) safely when parsing a ping
     GROUP_STRIP_PUNCT = string.punctuation.replace('-', '')
 
