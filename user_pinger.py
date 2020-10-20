@@ -691,14 +691,14 @@ class UserPinger(object):
             return
 
         public_commands: Dict[str, Callable[[str, praw.models.Redditor], None]] = {
-                "help": help_command,
                 "addtogroup": add_to_group,
-                "removefromgroup": remove_from_group,
-                "unsubscribe": unsubscribe,
-                "list": list_groups
+                "unsubscribe": unsubscribe
             }
 
         mod_commands: Dict[str, Callable[[str, praw.models.Redditor], None]] = {
+                "removefromgroup": remove_from_group,
+                "list": list_groups,
+                "help": help_command,
                 "protectgroup": protect_group,
                 "unprotectgroup": unprotect_group,
                 "makepublicgroup": make_public_group,
