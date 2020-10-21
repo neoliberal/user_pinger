@@ -33,6 +33,7 @@ class UserPinger(object):
             signal.signal(signal.SIGTERM, self.exit)
 
         self.logger: logging.Logger = slack_logger.initialize("user_pinger")
+        self.logger.setLevel("INFO")
         self.logger.debug("Initializing")
         self.reddit: praw.Reddit = reddit
         self.primary_subreddit: praw.models.Subreddit = self.reddit.subreddit(
@@ -290,7 +291,7 @@ class UserPinger(object):
                               ("Unsubscribe from all groups", f"Unsubscribe from all groups", "unsubscribe", "")])])
             posted.edit(body)
 
-        self.logger.debug("Pinging group")
+        self.logger.info("Pinging group \"%s\"", group)
 
         self.logger.debug("Posting comment")
         try:
@@ -331,7 +332,7 @@ class UserPinger(object):
         edit_comment(posted_comment)
         self.logger.debug("Edited comment")
 
-        self.logger.debug("Pinged group \"%s\"", group)
+        self.logger.info("Pinged group \"%s\"", group)
         return
 
     def handle_command(self, message: praw.models.Message) -> None:
@@ -341,7 +342,7 @@ class UserPinger(object):
         data: str = ' '.join(words[1:])
         author: praw.models.Redditor = message.author
 
-        self.logger.debug("Handling Command %s by %s", command, author)
+        self.logger.info("Handling Command %s by %s", command, author)
 
         self.logger.debug("Updating config")
         self.config = self._get_wiki_page(["config"])
@@ -408,6 +409,7 @@ class UserPinger(object):
             Usage:
             body = addtogroup [group you want to be added to]
             """
+            self.logger.info("Adding %s to group \"%s\"", author, body)
             self.logger.debug("Getting groups")
             groups: ConfigParser = self._get_wiki_page(["config", "groups"])
             self.logger.debug("Got groups")
@@ -426,9 +428,8 @@ class UserPinger(object):
                 return
             self.logger.debug("Group is not protected")
 
-            self.logger.debug("Adding %s to group \"%s\"", author, body)
             groups.set(body.upper(), str(author), None)
-            self.logger.debug("Added successfully")
+            self.logger.info("Added successfully")
 
             self._send_pm(f"Added to Group {body.upper()}", [f"You were added to group {body.upper()}"], author)
             # Revision reasons cannot contain emojis. This works around that.
@@ -481,7 +482,7 @@ class UserPinger(object):
             """
             data = data.upper()
             unsub_groups: List[str] = data.split()
-            self.logger.debug(f"Processing unsubscribe {str(author)} from {str(unsub_groups)}")
+            self.logger.info(f"Processing unsubscribe {str(author)} from {str(unsub_groups)}")
             self.logger.debug("Getting groups")
             groups: ConfigParser = self._get_wiki_page(["config", "groups"])
             self.logger.debug("Got groups")
@@ -490,7 +491,7 @@ class UserPinger(object):
                     username = str(username[0]).upper()
                     if (not unsub_groups or group_name in unsub_groups):
                         if str(author).upper() == username.upper():
-                            self.logger.debug(f"Removing {username} from {group_name}")
+                            self.logger.info(f"Removing {username} from {group_name}")
                             remove_from_group(group_name, author)
                             break # Don't try to remove the same user multiple times
             return
