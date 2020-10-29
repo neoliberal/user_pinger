@@ -146,8 +146,11 @@ class UserPinger(object):
     def _send_pm(self, subject: str, body: List[str], author: praw.models.Redditor) -> None:
         """sends PM"""
         self.logger.debug("Sending PM to %s", author)
-        author.message(subject=subject[:240], message="\n\n".join(body)[:240])
-        self.logger.debug("Sent PM to %s", author)
+        try:
+            author.message(subject=subject[:240], message="\n\n".join(body)[:240])
+            self.logger.debug("Sent PM to %s", author)
+        except praw.exceptions.RedditAPIException as e:
+            self.logger.error("Unable to send PM to %s, exception: %s", author, e)
         return
 
     def _send_error_pm(self, subject: str, body: List[str], author: praw.models.Redditor) -> None:
