@@ -32,7 +32,11 @@ class UserPinger(object):
             """registers signals"""
             signal.signal(signal.SIGTERM, self.exit)
 
-        self.logger: logging.Logger = slack_logger.initialize("user_pinger")
+        self.logger: logging.Logger = slack_logger.initialize(
+            app_name = "user_pinger",
+            stream_loglevel = "INFO",
+            slack_loglevel = "CRITICAL",
+        )
         self.logger.setLevel("INFO")
         self.logger.debug("Initializing")
         self.reddit: praw.Reddit = reddit

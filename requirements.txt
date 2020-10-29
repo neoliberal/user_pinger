@@ -1,2 +1,2 @@
 praw==7.1.0
-git+https://github.com/neoliberal/slack_python_logging
+git+https://github.com/neoliberal/slack_python_logging@v2.2.0
