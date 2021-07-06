@@ -480,19 +480,16 @@ class UserPinger(object):
 
             error_message: str = ""
             valid_groups: List[str] = []
-            invalid_groups: List[str] = []
             for group in groups_to_add:
                 self.logger.debug("Checking if group exists or is protected")
                 if self.group_exists(group, list_of_all_groups) is False:
                     self.logger.debug("Group does not exist")
                     self.logger.warning(f"Add group request {group} by {author} is invalid (does not exist)")
-                    error_message += f"* The group \"{group}\" does not exist\n\n"
-                    return
+                    error_message += f"* The group \"{group}\" does not exist.\n\n"
                 elif self.protected_group(body):
                     self.logger.debug("Group is protected")
                     self.logger.warning("%s tried to add themselves to protected group \"%s\"", author, body)
-                    error_message += f"* You attempted to add yourself to protected group {body}.\n\n"
-                    return
+                    error_message += f"* You attempted to add yourself to protected group {group}.\n\n"
                 else:
                     self.logger.debug("Group exists and is not protected")
                     valid_groups.append(group.upper())
@@ -516,34 +513,41 @@ class UserPinger(object):
             body = removefromgroup [group you want to be removed from]
             body = removefromgroup [group1]+[group2]+...
             """
+            groups_to_add: List[str] = body.replace(", ", "+").replace(",","+").split("+")
             self.logger.debug("Getting groups")
             groups: ConfigParser = self._get_wiki_page(["config", "groups"])
             self.logger.debug("Got groups")
 
-            self.logger.debug("Checking if group exists")
-            if self.group_exists(body, groups) is None:
-                self.logger.warning(f"Remove group request {body} by {author} is invalid")
-                self._send_error_pm(f"Group {body} does not exist", [f"You attempted to remove yourself from group {body} which does not exist"], author)
-                return
-            self.logger.debug("Group exists")
+            error_message: str = ""
+            valid_groups: List[str] = []
+            for group in groups_to_add:
+                self.logger.debug("Checking if group exists or is protected")
+                if self.group_exists(group, list_of_all_groups) is False:
+                    self.logger.debug("Group does not exist")
+                    self.logger.warning(f"Add group request {group} by {author} is invalid (does not exist)")
+                    error_message += f"* The group \"{group}\" does not exist.\n\n"
+                else:
+                    valid_groups += group
 
-            self.logger.debug("Removing %s from group %s", author, body)
+            self.logger.debug("Removing %s from groups %s", author, "+".join(valid_groups))
             regex = re.compile(str(author), flags=re.IGNORECASE)
-            matches = list(filter(regex.match, groups.options(body.upper())))
-
-            if not matches:
-                self.logger.warning("Remove group request is invalid")
-                self._send_error_pm(f"Cannot remove non-member from {body}", [f"You could not be removed from group {body} because you are not a member"], author)
-            else:
-                for match in matches:
-
-                    groups.remove_option(body.upper(), match)
+            for group in valid_groups:
+                matches += list(filter(regex.match, groups.options(group.upper())))
+            if error_message:
+                self.logger.warning("Remove group request has invalid argument(s)")
+                self._send_error_pm(f"Cannot remove non-member from group", [f"You could not be removed from one or more groups because you are not a member:\n\n" + error_message], author)
+            if valid_groups:
+                for group in valid_groups:
+                    for match in matches:
+                        groups.remove_option(group.upper(), match)
                 self.logger.debug("Removed from group")
-                self._send_pm(f"Removed from Group {body.upper()}", [f"You were removed from group {body.upper()}"], author)
-                # Revision reasons cannot contain emojis. This works around that.
+                if valid_groups == 1:
+                    self._send_pm(f"Removed from Group {valid_groups[0].upper()}", [f"You were removed from group {valid_groups[0].upper()}"], author)
+                else:
+                    self._send_pm(f"""Removed from Groups {", ".join(valid_groups[:-1]) + " and " + valid_groups[-1]}""", [f"""You were removed from groups {", ".join(valid_groups[:-1]) + " and " + valid_groups[-1]}"""], author)
+                    # Revision reasons cannot contain emojis. This works around that.
                 revision_reason = group.replace('🔮', '[Crystal Ball]').encode('ascii', 'ignore').decode('utf-8')
                 self._update_wiki_page(["config", "groups"], groups, message=f"Removed /u/{author} from Group {revision_reason}")
-
             return
 
         def unsubscribe(data: str, author: praw.models.Redditor) -> None:
@@ -554,19 +558,22 @@ class UserPinger(object):
             body = unsubscribe [group_name]
             """
             data = data.upper()
+
             unsub_groups: List[str] = data.split()
             self.logger.info(f"Processing unsubscribe {str(author)} from {str(unsub_groups)}")
             self.logger.debug("Getting groups")
             groups: ConfigParser = self._get_wiki_page(["config", "groups"])
             self.logger.debug("Got groups")
+            groups_to_remove: List[str] = []
             for (group_name, usernames) in groups.items():
                 for username in usernames.items():
                     username = str(username[0]).upper()
                     if (not unsub_groups or group_name in unsub_groups):
                         if str(author).upper() == username.upper():
                             self.logger.info(f"Removing {username} from {group_name}")
-                            remove_from_group(group_name, author)
+                            groups_to_remove.append(group_name)
                             break # Don't try to remove the same user multiple times
+            remove_from_group("+".join(groups_to_remove), author)
             return
 
         def list_groups(_, author: praw.models.Redditor) -> None:
