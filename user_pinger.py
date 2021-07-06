@@ -493,6 +493,10 @@ class UserPinger(object):
                 else:
                     self.logger.debug("Group exists and is not protected")
                     valid_groups.append(group.upper())
+            if error_message:
+                self.logger.warning("Add to group request has invalid argument(s)")
+                self._send_error_pm(f"Cannot add to group", [f"One or more groups do not exist or are protected:\n\n" + error_message], author)
+
             for group in valid_groups:
                 list_of_all_groups.set(group, str(author), None)
                 self.logger.info("Added successfully")
