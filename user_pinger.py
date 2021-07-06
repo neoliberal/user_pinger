@@ -159,8 +159,13 @@ class UserPinger(object):
         return
 
     def _send_error_pm(self, subject: str, body: List[str], author: praw.models.Redditor) -> None:
-        self.logger.debug("Sending Error PM \"%s\" to %s", subject, author)
-        self._send_pm(f"Userpinger Error: {subject}", body, author)
+        try:
+            self.logger.debug("Sending Error PM \"%s\" to %s", subject, author)
+            self._send_pm(f"Userpinger Error: {subject}", body, author)
+        except praw.exceptions.RedditAPIException as e:
+            self.logger.error("Unable to send PM to %s, exception: %s", author, e)
+        return
+
 
     def listen(self) -> None:
         """lists to subreddit's comments for pings"""
