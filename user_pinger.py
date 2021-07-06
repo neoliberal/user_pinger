@@ -466,33 +466,46 @@ class UserPinger(object):
 
             Usage:
             body = addtogroup [group you want to be added to]
+            body = addtogroup [group 1]+[group 2]+...
             """
-            self.logger.info("Adding %s to group \"%s\"", author, body)
+            # "addtogroup DAD+USA-CVILLE" and "addtogroup DAD, USA-CVILLE" and "addtogroup DAD,USA-CVILLE" are equivalent
+            groups_to_add: List[str] = body.replace(", ", "+").replace(",","+").split("+")
+
+
+            self.logger.info("Adding %s to group(s) \"%s\"", author, body)
             self.logger.debug("Getting groups")
-            groups: ConfigParser = self._get_wiki_page(["config", "groups"])
+            list_of_all_groups: ConfigParser = self._get_wiki_page(["config", "groups"])
             self.logger.debug("Got groups")
+            
 
-            self.logger.debug("Checking if group exists")
-            if self.group_exists(body, groups) is False:
-                self.logger.warning(f"Add group request {body} by {author} is invalid (does not exist)")
-                self._send_error_pm("Invalid add group request", [f"The group \"{body}\" does not exist"], author)
-                return
-            self.logger.debug("Group exists")
-
-            self.logger.debug("Checking if group is protected")
-            if self.protected_group(body):
-                self.logger.warning("%s tried to add themselves to protected group \"%s\"", author, body)
-                self._send_error_pm("Attempted to add to protected group", [f"You attempted to add yourself to protected group {body}."], author)
-                return
-            self.logger.debug("Group is not protected")
-
-            groups.set(body.upper(), str(author), None)
-            self.logger.info("Added successfully")
-
-            self._send_pm(f"Added to Group {body.upper()}", [f"You were added to group {body.upper()}"], author)
-            # Revision reasons cannot contain emojis. This works around that.
-            revision_reason = body.upper().replace('🔮', '[Crystal Ball]').encode('ascii', 'ignore').decode('utf-8')
-            self._update_wiki_page(["config", "groups"], groups, f"Added /u/{author} to Group {revision_reason}")
+            error_message: str = ""
+            valid_groups: List[str] = []
+            invalid_groups: List[str] = []
+            for group in groups_to_add:
+                self.logger.debug("Checking if group exists or is protected")
+                if self.group_exists(group, list_of_all_groups) is False:
+                    self.logger.debug("Group does not exist")
+                    self.logger.warning(f"Add group request {group} by {author} is invalid (does not exist)")
+                    error_message += f"* The group \"{group}\" does not exist\n\n"
+                    return
+                elif self.protected_group(body):
+                    self.logger.debug("Group is protected")
+                    self.logger.warning("%s tried to add themselves to protected group \"%s\"", author, body)
+                    error_message += f"* You attempted to add yourself to protected group {body}.\n\n"
+                    return
+                else:
+                    self.logger.debug("Group exists and is not protected")
+                    valid_groups.append(group.upper())
+            for group in valid_groups:
+                list_of_all_groups.set(group, str(author), None)
+                self.logger.info("Added successfully")
+                # Revision reasons cannot contain emojis. This works around that.
+                revision_reason = group.replace('🔮', '[Crystal Ball]').encode('ascii', 'ignore').decode('utf-8')
+                self._update_wiki_page(["config", "groups"], list_of_all_groups, f"Added /u/{author} to Group {revision_reason}")
+            if len(valid_groups) == 1:
+                self._send_pm(f"Added to Group {valid_group[0]}", [f"You were added to group {valid_group[0]}"], author)
+            if len(valid_groups) > 1:
+                self._send_pm(f"""Added to Groups {"+".join(valid_group)}""", [f"You were added to groups {group}"], author)
             return
 
         def remove_from_group(body: str, author: praw.models.Redditor) -> None:
@@ -501,6 +514,7 @@ class UserPinger(object):
 
             Usage:
             body = removefromgroup [group you want to be removed from]
+            body = removefromgroup [group1]+[group2]+...
             """
             self.logger.debug("Getting groups")
             groups: ConfigParser = self._get_wiki_page(["config", "groups"])
@@ -522,11 +536,12 @@ class UserPinger(object):
                 self._send_error_pm(f"Cannot remove non-member from {body}", [f"You could not be removed from group {body} because you are not a member"], author)
             else:
                 for match in matches:
+
                     groups.remove_option(body.upper(), match)
                 self.logger.debug("Removed from group")
                 self._send_pm(f"Removed from Group {body.upper()}", [f"You were removed from group {body.upper()}"], author)
                 # Revision reasons cannot contain emojis. This works around that.
-                revision_reason = body.upper().replace('🔮', '[Crystal Ball]').encode('ascii', 'ignore').decode('utf-8')
+                revision_reason = group.replace('🔮', '[Crystal Ball]').encode('ascii', 'ignore').decode('utf-8')
                 self._update_wiki_page(["config", "groups"], groups, message=f"Removed /u/{author} from Group {revision_reason}")
 
             return
