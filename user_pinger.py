@@ -308,7 +308,7 @@ class UserPinger(object):
         if len(nonmember_groups) == 1:
             error_message += f"* You need to be a member of {nonmember_groups[0]} to ping it." + self._command_link(f"Click here, then click \"send\" to join {nonmember_groups[0]}.", f"Join {nonmember_groups[0]}", "addtogroup", nonmember_groups[0]) + "\n\n"
         elif (len(nonmember_groups) > 1):
-            error_message += f"""* You need to be a member of {", ".join(nonmember_groups[:-1]) + " and " + nonmember_groups[-1]} to ping them.""" + self._command_link(f"""Click here, then click \"send\" to join {", ".join(nonmember_groups[:-1]) + " and " + nonmember_groups[-1]}. """, f"Join {nonmember_groups[0]}", "addtogroup", "+".join(nonmember_groups)) + "\n\n"
+            error_message += f"""* You need to be a member of {", ".join(nonmember_groups[:-1]) + " and " + nonmember_groups[-1]} to ping them.""" + self._command_link(f"""Click here, then click "send" to join {", ".join(nonmember_groups[:-1]) + " and " + nonmember_groups[-1]}.""", f"Join {nonmember_groups[0]}", "addtogroup", "+".join(nonmember_groups)) + "\n\n"
 
 
         users = list(set(users))
@@ -371,7 +371,7 @@ class UserPinger(object):
                 unsub_msg = ""
                 for group in groups:
                     unsub_msg += self._command_link(f"^Click ^here ^to ^unsubscribe ^from ^{group}", f"Unsubscribe from group {group}", "unsubscribe", f"{group}") + "\n\n"
-                    unsub_msg += self._command_link(f"^Reply ^\"unsubscribe\" ^to ^stop ^receiving ^these ^messages", "Unsubscribe from all groups", "unsubscribe", "") + "\n\n"
+                unsub_msg += self._command_link(f"^Reply ^\"unsubscribe\" ^to ^stop ^receiving ^these ^messages", "Unsubscribe from all groups", "unsubscribe", "") + "\n\n"
                 self.reddit.redditor(user).message(
                     subject=f"You've been pinged by /u/{comment.author} in group {groups[0]}" if (len(groups) == 1) else f"""You've been pinged by /u/{comment.author} in group {("+".join(groups) if (len(groups) > 1) else groups[0])}""",
                     message=unsub_msg
