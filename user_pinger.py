@@ -177,9 +177,9 @@ class UserPinger(object):
                 if comment.banned_by is not None:
                     # Don't trigger on removed comments
                     continue
-                #DEBUG: if comment.created_utc < self.start_time:
+                if comment.created_utc < self.start_time:
                     # Don't trigger on comments posted prior to startup
-                    #continue
+                    continue
                 if str(comment) in self.parsed:
                     continue
                 self.handle_comment(comment)
@@ -302,13 +302,13 @@ class UserPinger(object):
                 users += members
 
         if len(invalid_groups) == 1:
-            error_message += f"* You tried to ping group {invalid_groups[0]} that does not exist. "
+            error_message += f"* You tried to ping group {invalid_groups[0]} that does not exist.\n\n"
         elif (len(invalid_groups) > 1):
             error_message += f"""* You tried to ping groups {", ".join(invalid_groups[:-1]) + " and " + invalid_groups[-1]} that do not exist. \n\n"""
         if len(nonmember_groups) == 1:
-            error_message += f"* You need to be a member of {nonmember_groups[0]} to ping it." + self._command_link(f"Click here, then click \"send\" to join {nonmember_groups[0]}. \n\n", f"Join {nonmember_groups[0]}", "addtogroup", nonmember_groups[0])
+            error_message += f"* You need to be a member of {nonmember_groups[0]} to ping it." + self._command_link(f"Click here, then click \"send\" to join {nonmember_groups[0]}.", f"Join {nonmember_groups[0]}", "addtogroup", nonmember_groups[0]) + "\n\n"
         elif (len(nonmember_groups) > 1):
-            error_message += f"""* You need to be a member of {", ".join(nonmember_groups[:-1]) + " and " + nonmember_groups[-1]} to ping them. \n\n""" + self._command_link(f"""Click here, then click \"send\" to join {", ".join(nonmember_groups[:-1]) + " and " + nonmember_groups[-1]}. """, f"Join {nonmember_groups[0]}", "addtogroup", "+".join(nonmember_groups))
+            error_message += f"""* You need to be a member of {", ".join(nonmember_groups[:-1]) + " and " + nonmember_groups[-1]} to ping them.""" + self._command_link(f"""Click here, then click \"send\" to join {", ".join(nonmember_groups[:-1]) + " and " + nonmember_groups[-1]}. """, f"Join {nonmember_groups[0]}", "addtogroup", "+".join(nonmember_groups)) + "\n\n"
 
 
         users = list(set(users))
@@ -321,11 +321,11 @@ class UserPinger(object):
         """pings users"""
         if error_message:
             if not groups:
-                send_error_pm(self, f"Invalid Group(s)", f"Your ping request has caused one or more errors:\n\n" + error_message, comment.author)
+                self._send_error_pm(f"Invalid Group(s)", [f"Your ping request has caused one or more errors:\n\n" + error_message], comment.author)
             elif len(groups) == 1:
-                send_error_pm(self, f"Invalid Group(s)", f"Group {groups[0]} has been successfully pinged. However, your ping request has caused one or more errors:\n\n" + error_message, comment.author)
+                self._send_error_pm(f"Invalid Group(s)", [f"Group {groups[0]} has been successfully pinged. However, your ping request has caused one or more errors:\n\n" + error_message], comment.author)
             else:
-                send_error_pm(self, f"""Invalid Group(s)", f"Groups {", ".join(groups[:-1]) + " and " + groups[-1]} have been successfully pinged. However, your ping request has caused one or more errors:\n\n""" + error_message, comment.author)
+                self._send_error_pm(f"Invalid Group(s)", [f"""Groups {", ".join(groups[:-1]) + " and " + groups[-1]} have been successfully pinged. However, your ping request has caused one or more errors:\n\n""" + error_message], comment.author)
         if not groups:
             return
 
@@ -368,6 +368,7 @@ class UserPinger(object):
             if user.lower() == str(comment.author).lower():
                 continue
             try:
+                unsub_msg = ""
                 for group in groups:
                     unsub_msg += self._command_link(f"^Click ^here ^to ^unsubscribe ^from ^{group}", f"Unsubscribe from group {group}", "unsubscribe", f"{group}") + "\n\n"
                     unsub_msg += self._command_link(f"^Reply ^\"unsubscribe\" ^to ^stop ^receiving ^these ^messages", "Unsubscribe from all groups", "unsubscribe", "") + "\n\n"
@@ -511,7 +512,7 @@ class UserPinger(object):
             if len(valid_groups) == 1:
                 self._send_pm(f"Added to Group {valid_groups[0]}", [f"You were added to group {valid_groups[0]}"], author)
             if len(valid_groups) > 1:
-                self._send_pm(f"""Added to Groups {"+".join(valid_group)}""", [f"You were added to groups {group}"], author)
+                self._send_pm(f"""Added to Groups {", ".join(valid_groups[:-1]) + " and " + valid_groups[-1]}""", [f"""You were added to groups {", ".join(valid_groups[:-1]) + " and " + valid_groups[-1]}"""], author)
             return
 
         def remove_from_group(body: str, author: praw.models.Redditor) -> None:
@@ -523,7 +524,7 @@ class UserPinger(object):
             body = removefromgroup [group1]+[group2]+...
             """
             groups_to_add: List[str] = body.replace(", ", "+").replace(",","+").split("+")
-            self.logger.debug("Getting groups")
+            self.logger.debug(f"Requested to remove groups {groups_to_add}. Getting groups")
             groups: ConfigParser = self._get_wiki_page(["config", "groups"])
             self.logger.debug("Got groups")
 
@@ -531,14 +532,14 @@ class UserPinger(object):
             valid_groups: List[str] = []
             for group in groups_to_add:
                 self.logger.debug("Checking if group exists or is protected")
-                if self.group_exists(group, list_of_all_groups) is False:
+                if self.group_exists(group, groups) is False:
                     self.logger.debug("Group does not exist")
                     self.logger.warning(f"Add group request {group} by {author} is invalid (does not exist)")
                     error_message += f"* The group \"{group}\" does not exist.\n\n"
                 else:
-                    valid_groups += group
-
-            self.logger.debug("Removing %s from groups %s", author, ("+".join(valid_groups) if (len(valid_groups) > 1) else valid_groups[0]))
+                    valid_groups.append(group)
+            if valid_groups:
+                self.logger.debug("Removing %s from groups %s", author, ("+".join(valid_groups) if (len(valid_groups) > 1) else valid_groups[0]))
             regex = re.compile(str(author), flags=re.IGNORECASE)
             for group in valid_groups:
                 matches += list(filter(regex.match, groups.options(group.upper())))
@@ -582,6 +583,7 @@ class UserPinger(object):
                             self.logger.info(f"Removing {username} from {group_name}")
                             groups_to_remove.append(group_name)
                             break # Don't try to remove the same user multiple times
+            self.logger.debug(f"""{groups_to_remove}""")
             remove_from_group("+".join(groups_to_remove), author)
             return
 
