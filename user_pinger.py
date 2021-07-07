@@ -35,10 +35,10 @@ class UserPinger(object):
 
         self.logger: logging.Logger = slack_logger.getLogger(
             app_name = "user_pingertest",
-            stream_loglevel = "DEBUG",
-            slack_loglevel = "DEBUG",
+            stream_loglevel = "INFO",
+            slack_loglevel = "CRITICAL",
         )
-        self.logger.setLevel("DEBUG")
+        self.logger.setLevel("INFO")
         self.logger.debug("Initializing")
         self.reddit: praw.Reddit = reddit
         self.primary_subreddit: praw.models.Subreddit = self.reddit.subreddit(
@@ -547,7 +547,10 @@ class UserPinger(object):
                 matches += list(filter(regex.match, groups.options(group.upper())))
             if error_message:
                 self.logger.warning("Remove group request has invalid argument(s)")
-                self._send_error_pm(f"Cannot remove non-member from group", [f"You could not be removed from one or more groups because you are not a member:\n\n" + error_message], author)
+                if valid_groups:
+                    self._send_error_pm(f"Userpinger Partial Error: Invalid Group", [f"You could not be removed from one or more groups for the following reason(s):\n\n" + error_message], author)
+                else:
+                    self._send_error_pm(f"Userpinger Error: Invalid Group", [f"You could not be removed from one or more groups for the following reason(s):\n\n" + error_message], author)
             if valid_groups:
                 for group in valid_groups:
                     for match in matches:
