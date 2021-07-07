@@ -290,16 +290,17 @@ class UserPinger(object):
         existant_groups: List[str] = []
         users: List[str] = []
         for group in groups:
-            members =  self.get_group_members(group, list_of_all_groups)
             if self.group_exists(group, list_of_all_groups) is False:
                 invalid_groups.append(group)
                 self.logger.warning("Group \"%s\" by %s does not exist", group, comment.author)
-            elif not (self.in_group(comment.author, members) or self.public_group(group) or self.is_moderator(comment.author)):
-                nonmember_groups.append(group)
-                self.logger.warning("Non-member %s tried to ping Group {%s}", comment.author, group)
             else:
-                existant_groups.append(group)
-                users += members
+                members =  self.get_group_members(group, list_of_all_groups)
+                if not (self.in_group(comment.author, members) or self.public_group(group) or self.is_moderator(comment.author)):
+                    nonmember_groups.append(group)
+                    self.logger.warning("Non-member %s tried to ping Group {%s}", comment.author, group)
+                else:
+                    existant_groups.append(group)
+                    users += members
 
         if len(invalid_groups) == 1:
             error_message += f"* You tried to ping group {invalid_groups[0]} that does not exist.\n\n"
@@ -374,7 +375,7 @@ class UserPinger(object):
                 unsub_msg += self._command_link(f"^Reply ^\"unsubscribe\" ^to ^stop ^receiving ^these ^messages", "Unsubscribe from all groups", "unsubscribe", "") + "\n\n"
                 self.reddit.redditor(user).message(
                     subject=f"You've been pinged by /u/{comment.author} in group {groups[0]}" if (len(groups) == 1) else f"""You've been pinged by /u/{comment.author} in group {("+".join(groups) if (len(groups) > 1) else groups[0])}""",
-                    message=unsub_msg
+                    message=f"[Click here to view the comment]({str(comment.permalink)}?context=1000)\n\n---" + unsub_msg
                 )
             except praw.exceptions.APIException as ex:
                 self.logger.debug("%s could not be found in group %s", user, group)
@@ -541,6 +542,7 @@ class UserPinger(object):
             if valid_groups:
                 self.logger.debug("Removing %s from groups %s", author, ("+".join(valid_groups) if (len(valid_groups) > 1) else valid_groups[0]))
             regex = re.compile(str(author), flags=re.IGNORECASE)
+            matches = []
             for group in valid_groups:
                 matches += list(filter(regex.match, groups.options(group.upper())))
             if error_message:
@@ -551,7 +553,7 @@ class UserPinger(object):
                     for match in matches:
                         groups.remove_option(group.upper(), match)
                 self.logger.debug("Removed from group")
-                if valid_groups == 1:
+                if len(valid_groups) == 1:
                     self._send_pm(f"Removed from Group {valid_groups[0].upper()}", [f"You were removed from group {valid_groups[0].upper()}"], author)
                 else:
                     self._send_pm(f"""Removed from Groups {", ".join(valid_groups[:-1]) + " and " + valid_groups[-1]}""", [f"""You were removed from groups {", ".join(valid_groups[:-1]) + " and " + valid_groups[-1]}"""], author)
@@ -569,8 +571,12 @@ class UserPinger(object):
             """
             data = data.upper()
 
-            unsub_groups: List[str] = data.split()
-            self.logger.info(f"Processing unsubscribe {str(author)} from {str(unsub_groups)}")
+            
+            if data and (not data.isspace()):
+                self.logger.info(f"Processing unsubscribe {str(author)} from {data}")
+                remove_from_group(data.replace(', ', "+").replace(" ", "+").replace(",", "+"), author)
+                return
+            self.logger.info(f"Processing unsubscribe {str(author)} from all")
             self.logger.debug("Getting groups")
             groups: ConfigParser = self._get_wiki_page(["config", "groups"])
             self.logger.debug("Got groups")
@@ -578,11 +584,10 @@ class UserPinger(object):
             for (group_name, usernames) in groups.items():
                 for username in usernames.items():
                     username = str(username[0]).upper()
-                    if (not unsub_groups or group_name in unsub_groups):
-                        if str(author).upper() == username.upper():
-                            self.logger.info(f"Removing {username} from {group_name}")
-                            groups_to_remove.append(group_name)
-                            break # Don't try to remove the same user multiple times
+                    if str(author).upper() == username.upper():
+                        self.logger.info(f"Removing {username} from {group_name}")
+                        groups_to_remove.append(group_name)
+                        break # Don't try to remove the same user multiple times
             self.logger.debug(f"""{groups_to_remove}""")
             remove_from_group("+".join(groups_to_remove), author)
             return
