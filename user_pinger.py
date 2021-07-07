@@ -35,10 +35,10 @@ class UserPinger(object):
 
         self.logger: logging.Logger = slack_logger.getLogger(
             app_name = "user_pingertest",
-            stream_loglevel = "INFO",
+            stream_loglevel = "DEBUG",
             slack_loglevel = "CRITICAL",
         )
-        self.logger.setLevel("INFO")
+        self.logger.setLevel("DEBUG")
         self.logger.debug("Initializing")
         self.reddit: praw.Reddit = reddit
         self.primary_subreddit: praw.models.Subreddit = self.reddit.subreddit(
@@ -139,7 +139,8 @@ class UserPinger(object):
         return
 
     def _footer(self, commands: List[Tuple[str, ...]]) -> str:
-        return ' | '.join([self._userpinger_documentation_link()] + [self._command_link(*command) for command in commands])
+        self.logger.debug(f"Constructing footer {commands}")
+        return ' | '.join([self._userpinger_documentation_link()] + [self._command_link(*command) for command in commands]) 
 
     def _userpinger_documentation_link(self) -> str:
         return f"[About & group list](https://reddit.com/r/{self.primary_subreddit.display_name}/wiki/userpinger/documentation)"
@@ -226,12 +227,11 @@ class UserPinger(object):
 
     def handle_comment(self, comment: praw.models.Comment) -> None:
         """handles ping"""
-       
-        # 3. Finally, passes the first N (determined by the constant MAX_PINGS_PER_COMMENT) group names to 
         # "+" represents the "union" operator for multiple pings in the same comment.
+        # Multiple pings can be called in one comment with !ping A+B+C or multiple !ping statements.
         # "-" is not a special operator. It is just part of the name of many ping groups.
 
-        # 1. Splits the (capitalized) comment by whitespace and +, and creates a list of substrings immediately
+        #  Splits the (capitalized) comment by whitespace and +, and creates a list of substrings immediately
         #  following each substring !ping, potentially split into separate substrings divided by a "+"
         split: List[str] = comment.body.upper().split()
         self.parsed.append(str(comment))
@@ -347,10 +347,15 @@ class UserPinger(object):
                                   ("Unsubscribe from this group", f"Unsubscribe from group {groups[0]}", "unsubscribe", f"{groups[0]}"),
                                   ("Unsubscribe from all groups", f"Unsubscribe from all groups", "unsubscribe", "")])])
             else:
+                subscribe_buttons: List[Tuple[str, ...]] = []
+                for group in groups:
+                    subscribe_buttons.append((f"Subscribe to group {group}", f"""Add yourself to group {group}""", "addtogroup", f"{group}"))
+                for group in groups:
+                    subscribe_buttons.append((f"Unsubscribe from group {group}", f"""Unsubscribe from group {group}""", "unsubscribe", f"{group}"))
+
                 body: str = "\n\n".join([f"""Pinged members of {", ".join(groups[:-1]) + " and " + groups[-1]} groups.""",
-                    self._footer([("Subscribe to this group", f"""Add yourself to group(s) {"+".join(groups)}""", "addtogroup", f"""{"+".join(groups)}"""),
-                                  ("Unsubscribe from this group", f"""Unsubscribe from group(s) {"+".join(groups)}""", "unsubscribe", f"""{"+".join(groups)}"""),
-                                  ("Unsubscribe from all groups", f"Unsubscribe from all groups", "unsubscribe", "")])])
+                    self._footer(subscribe_buttons + 
+                                  [("Unsubscribe from all groups", f"Unsubscribe from all groups", "unsubscribe", "")])])
 
             posted.edit(body)
 
@@ -476,7 +481,7 @@ class UserPinger(object):
             body = addtogroup [group 1]+[group 2]+...
             """
             # "addtogroup DAD+USA-CVILLE" and "addtogroup DAD, USA-CVILLE" and "addtogroup DAD,USA-CVILLE" are equivalent
-            groups_to_add: List[str] = body.replace(", ", "+").replace(",","+").split("+")
+            groups_to_add: List[str] = body.replace(", ", "+").replace(",","+").replace(" ","+").split("+")
 
 
             self.logger.info("Adding %s to group(s) \"%s\"", author, body)
