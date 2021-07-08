@@ -35,10 +35,10 @@ class UserPinger(object):
 
         self.logger: logging.Logger = slack_logger.getLogger(
             app_name = "user_pingertest",
-            stream_loglevel = "DEBUG",
+            stream_loglevel = "INFO",
             slack_loglevel = "CRITICAL",
         )
-        self.logger.setLevel("DEBUG")
+        self.logger.setLevel("INFO")
         self.logger.debug("Initializing")
         self.reddit: praw.Reddit = reddit
         self.primary_subreddit: praw.models.Subreddit = self.reddit.subreddit(
@@ -139,7 +139,6 @@ class UserPinger(object):
         return
 
     def _footer(self, commands: List[Tuple[str, ...]]) -> str:
-        self.logger.debug(f"Constructing footer {commands}")
         return ' | '.join([self._userpinger_documentation_link()] + [self._command_link(*command) for command in commands]) 
 
     def _userpinger_documentation_link(self) -> str:
@@ -303,13 +302,13 @@ class UserPinger(object):
                     users += members
 
         if len(invalid_groups) == 1:
-            error_message += f"* You tried to ping group {invalid_groups[0]} that does not exist.\n\n"
+            error_message += f"* You tried to ping group {invalid_groups[0]} that does not exist. \n\n"
         elif (len(invalid_groups) > 1):
             error_message += f"""* You tried to ping groups {", ".join(invalid_groups[:-1]) + " and " + invalid_groups[-1]} that do not exist. \n\n"""
         if len(nonmember_groups) == 1:
-            error_message += f"* You need to be a member of {nonmember_groups[0]} to ping it." + self._command_link(f"Click here, then click \"send\" to join {nonmember_groups[0]}.", f"Join {nonmember_groups[0]}", "addtogroup", nonmember_groups[0]) + "\n\n"
+            error_message += f"* You need to be a member of {nonmember_groups[0]} to ping it. " + self._command_link(f"""Click here, then click "send" to join {nonmember_groups[0]}.""", f"Join {nonmember_groups[0]}", "addtogroup", nonmember_groups[0]) + "\n\n"
         elif (len(nonmember_groups) > 1):
-            error_message += f"""* You need to be a member of {", ".join(nonmember_groups[:-1]) + " and " + nonmember_groups[-1]} to ping them.""" + self._command_link(f"""Click here, then click "send" to join {", ".join(nonmember_groups[:-1]) + " and " + nonmember_groups[-1]}.""", f"Join {nonmember_groups[0]}", "addtogroup", "+".join(nonmember_groups)) + "\n\n"
+            error_message += f"""* You need to be a member of {", ".join(nonmember_groups[:-1]) + " and " + nonmember_groups[-1]} to ping them. """ + self._command_link(f"""Click here, then click "send" to join {", ".join(nonmember_groups[:-1]) + " and " + nonmember_groups[-1]}.""", f"Join {nonmember_groups[0]}", "addtogroup", "+".join(nonmember_groups)) + "\n\n"
 
 
         users = list(set(users))
