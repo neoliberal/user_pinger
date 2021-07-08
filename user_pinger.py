@@ -379,7 +379,7 @@ class UserPinger(object):
                 unsub_msg += self._command_link(f"^Reply ^\"unsubscribe\" ^to ^stop ^receiving ^these ^messages", "Unsubscribe from all groups", "unsubscribe", "") + "\n\n"
                 self.reddit.redditor(user).message(
                     subject=f"You've been pinged by /u/{comment.author} in group {groups[0]}" if (len(groups) == 1) else f"""You've been pinged by /u/{comment.author} in group {("+".join(groups) if (len(groups) > 1) else groups[0])}""",
-                    message=f"[Click here to view the comment]({str(comment.permalink)}?context=1000)\n\n---" + unsub_msg
+                    message=f"[Click here to view the comment]({str(comment.permalink)}?context=1000)\n\n---\nn" + unsub_msg
                 )
             except praw.exceptions.APIException as ex:
                 self.logger.debug("%s could not be found in group %s", user, group)
