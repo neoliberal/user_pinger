@@ -595,8 +595,11 @@ class UserPinger(object):
                         self.logger.info(f"Removing {username} from {group_name}")
                         groups_to_remove.append(group_name)
                         break # Don't try to remove the same user multiple times
-            self.logger.debug(f"""{groups_to_remove}""")
-            remove_from_group("+".join(groups_to_remove), author)
+            if groups_to_remove:
+                remove_from_group("+".join(groups_to_remove), author)
+            else:
+                self._send_error_pm(f"Invalid Unsubscribe", [f"You were already not a member of any group.\n\n"], author)
+
             return
 
         def list_groups(_, author: praw.models.Redditor) -> None:
