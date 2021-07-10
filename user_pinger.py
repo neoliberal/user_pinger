@@ -20,9 +20,10 @@ class UserPinger(object):
         "reddit", "primary_subreddit", "subreddits", "config", "logger", "parsed", "start_time"
     ]
     # Group names must be ASCII upper case separated by '-'
-    GROUP_ALLOWED_CHARS = string.ascii_uppercase + string.digits + '-'
+    GROUP_ALLOWED_CHARS = string.ascii_uppercase + string.digits + '-' + '+'
     # Punctuation that we can strip (leading/trailing) safely when parsing a ping
-    GROUP_STRIP_PUNCT = string.punctuation.replace('-', '')
+    GROUP_STRIP_PUNCT = string.punctuation.replace('-', '').replace('+', '')
+    MAX_PINGS_PER_COMMENT = 3
 
 
     def __init__(self, reddit: praw.Reddit, subreddit: str) -> None:
@@ -32,8 +33,8 @@ class UserPinger(object):
             """registers signals"""
             signal.signal(signal.SIGTERM, self.exit)
 
-        self.logger: logging.Logger = slack_logger.initialize(
-            app_name = "user_pinger",
+        self.logger: logging.Logger = slack_logger.getLogger(
+            app_name = "user_pingertest",
             stream_loglevel = "INFO",
             slack_loglevel = "CRITICAL",
         )
@@ -138,12 +139,12 @@ class UserPinger(object):
         return
 
     def _footer(self, commands: List[Tuple[str, ...]]) -> str:
-        return ' | '.join([self._userpinger_documentation_link()] + [self._command_link(*command) for command in commands])
+        return ' | '.join([self._userpinger_documentation_link()] + [self._command_link(*command) for command in commands]) 
 
     def _userpinger_documentation_link(self) -> str:
         return f"[About & group list](https://reddit.com/r/{self.primary_subreddit.display_name}/wiki/userpinger/documentation)"
 
-    def _command_link(self, name: str, header: str, action: str, data: str) -> str:
+    def _command_link(self, name: str, header: str, action: str, data: List[str]) -> str:
         command: str = f"{action} {data}"
         return f"[{name}](https://reddit.com/message/compose?to={str(self.reddit.user.me())}&subject={quote(header)}&message={quote(command)})"
 
@@ -158,8 +159,13 @@ class UserPinger(object):
         return
 
     def _send_error_pm(self, subject: str, body: List[str], author: praw.models.Redditor) -> None:
-        self.logger.debug("Sending Error PM \"%s\" to %s", subject, author)
-        self._send_pm(f"Userpinger Error: {subject}", body, author)
+        try:
+            self.logger.debug("Sending Error PM \"%s\" to %s", subject, author)
+            self._send_pm(f"Userpinger Error: {subject}", body, author)
+        except praw.exceptions.RedditAPIException as e:
+            self.logger.error("Unable to send PM to %s, exception: %s", author, e)
+        return
+
 
     def listen(self) -> None:
         """lists to subreddit's comments for pings"""
@@ -220,39 +226,51 @@ class UserPinger(object):
 
     def handle_comment(self, comment: praw.models.Comment) -> None:
         """handles ping"""
+        # "+" represents the "union" operator for multiple pings in the same comment.
+        # Multiple pings can be called in one comment with !ping A+B+C or multiple !ping statements.
+        # "-" is not a special operator. It is just part of the name of many ping groups.
+
+        #  Splits the (capitalized) comment by whitespace and +, and creates a list of substrings immediately
+        #  following each substring !ping, potentially split into separate substrings divided by a "+"
         split: List[str] = comment.body.upper().split()
         self.parsed.append(str(comment))
-
-        try:
-            index: int = split.index("!PING")
-        except ValueError:
-            # no trigger
-            return
-        self.logger.debug("Ping found in %s", str(comment))
-        try:
-            token: str = split[index + 1]
-        except IndexError:
+        tokens: List[str] = []
+        for index, value in enumerate(split):
+            group = ""
+            if (value == "!PING"):
+                try:
+                    group = split[index + 1]
+                    tokens += group.split("+")
+                except IndexError:
+                    break
+        if not tokens:
             self.logger.debug("End of comment with no group specified")
             return
-        self.logger.debug("Comment contained group token %s", token)
+        self.logger.debug("Comment contained group tokens [%s]", ', '.join(tokens))
 
-        # Strip punctuation like:
-        # !ping WEEBS, what do you folks think of this?
-        trigger: str = token.strip(self.GROUP_STRIP_PUNCT)
+        valid: List[str] = []
+        invalid: List[str] = []
+        triggers = list(map(lambda x: x.strip(self.GROUP_STRIP_PUNCT), tokens))
 
-        # Validate group name to save having to look up invalid names
-        ret: bool
-        msg: Optional[str]
-        ret, msg = self._validate_group_name(trigger)
-        if not ret:
-            self.logger.debug(msg)
-            self._send_error_pm(f"Invalid group name", [f"The group name {trigger} contains invalid characters"], comment.author)
-            return
+        # Checks which of those group names are valid, and creates a list of valid group names and another of invalid group names.
+        # The valid group names are passed to the handle_ping function and the invalid group names are sent in an error message to the comment author.
+        for iterate_through_pings in range(min(len(triggers), self.MAX_PINGS_PER_COMMENT)):
+            msg: Optional[str]
+            (is_valid_group_name, msg) = self._validate_group_name(triggers[iterate_through_pings])
+            if is_valid_group_name:
+                valid.append(triggers[iterate_through_pings])
+            if msg is not None:
+                self.logger.debug(msg)
+        error_message: str = ""
+        if (len(invalid) == 1):
+            error_message += f"* The group name {invalid[0]} contains invalid characters. \n\n"
+            if (len(invalid) > 1):
+                error_message += f"""* The group names {", ".join(invalid[:-1]) + " and " + invalid[-1]} contain invalid characters. \n\n"""
 
-        self.logger.debug("Pinging group %s", trigger)
-        self.handle_ping(trigger, comment)
+        self.logger.debug(f"Pinging group(s) {valid}")
+        self.handle_ping(valid, error_message, comment)
 
-    def handle_ping(self, group: str, comment: praw.models.Comment) -> None:
+    def handle_ping(self, groups: List[str], error_message: str, comment: praw.models.Comment) -> None:
         """handles ping"""
         self.logger.debug("Handling ping")
 
@@ -260,45 +278,87 @@ class UserPinger(object):
         self.config = self._get_wiki_page(["config"])
         self.logger.debug("Updated config")
 
-        self.logger.debug("Getting groups")
-        groups: ConfigParser = self._get_wiki_page(["config", "groups"])
-        self.logger.debug("Got groups")
+        self.logger.debug("Getting list of all groups from the wiki")
+        list_of_all_groups: ConfigParser = self._get_wiki_page(["config", "groups"])
+        self.logger.debug("Got list of all groups from the wiki")
 
-        self.logger.debug("Getting users in group")
+        self.logger.debug("Getting users in groups")
 
-        if self.group_exists(group, groups) is False:
-            self.logger.warning("Group \"%s\" by %s does not exist", group, comment.author)
-            self._send_pm("Invalid Ping", [f"You pinged group {group} that does not exist"], comment.author)
-            return
-        users: Optional[List[str]] = self.get_group_members(group, groups)
-        self.logger.debug("Got users in group")
+        invalid_groups: List[str] = [] 
+        nonmember_groups: List[str] = []
+        existant_groups: List[str] = []
+        users: List[str] = []
+        for group in groups:
+            if self.group_exists(group, list_of_all_groups) is False:
+                invalid_groups.append(group)
+                self.logger.warning("Group \"%s\" by %s does not exist", group, comment.author)
+            else:
+                members =  self.get_group_members(group, list_of_all_groups)
+                if not (self.in_group(comment.author, members) or self.public_group(group) or self.is_moderator(comment.author)):
+                    nonmember_groups.append(group)
+                    self.logger.warning("Non-member %s tried to ping Group {%s}", comment.author, group)
+                else:
+                    existant_groups.append(group)
+                    users += members
 
-        self.logger.debug("Checking if author is in group or group is public")
-        if not (self.in_group(comment.author, users) or self.public_group(group) or self.is_moderator(comment.author)):
-            self.logger.warning("Non-member %s tried to ping \"%s\" group", comment.author, group)
-            self._send_error_pm(f"Cannot ping Group {group}", [f"You need to be a member of {group} to ping it", self._command_link(f"Click here, then click \"send\" to join {group}", f"Join {group}", "addtogroup", f"{group}") ], comment.author)
-            return
-        self.logger.debug("Checked that author is in group")
+        if len(invalid_groups) == 1:
+            error_message += f"* You tried to ping group {invalid_groups[0]} that does not exist. \n\n"
+        elif (len(invalid_groups) > 1):
+            error_message += f"""* You tried to ping groups {", ".join(invalid_groups[:-1]) + " and " + invalid_groups[-1]} that do not exist. \n\n"""
+        if len(nonmember_groups) == 1:
+            error_message += f"* You need to be a member of {nonmember_groups[0]} to ping it. " + self._command_link(f"""Click here, then click "send" to join {nonmember_groups[0]}.""", f"Join {nonmember_groups[0]}", "addtogroup", nonmember_groups[0]) + "\n\n"
+        elif (len(nonmember_groups) > 1):
+            error_message += f"""* You need to be a member of {", ".join(nonmember_groups[:-1]) + " and " + nonmember_groups[-1]} to ping them. """ + self._command_link(f"""Click here, then click "send" to join {", ".join(nonmember_groups[:-1]) + " and " + nonmember_groups[-1]}.""", f"Join {nonmember_groups[0]}", "addtogroup", "+".join(nonmember_groups)) + "\n\n"
 
-        self.ping_users(group, users, comment)
-        return
 
-    def ping_users(self, group: str, users: List[str], comment: praw.models.Comment) -> None:
+        users = list(set(users))
+        self.logger.debug(f"Got users in groups {existant_groups}")
+
+        self.ping_users(existant_groups, users, error_message, comment)
+        return 
+
+    def ping_users(self, groups: List[str], users: List[str], error_message: str, comment: praw.models.Comment) -> None:
         """pings users"""
+        if error_message:
+            if not groups:
+                self._send_error_pm(f"Invalid Group(s)", [f"Your ping request has caused one or more errors:\n\n" + error_message], comment.author)
+            elif len(groups) == 1:
+                self._send_error_pm(f"Invalid Group(s)", [f"Group {groups[0]} has been successfully pinged. However, your ping request has caused one or more errors:\n\n" + error_message], comment.author)
+            else:
+                self._send_error_pm(f"Invalid Group(s)", [f"""Groups {", ".join(groups[:-1]) + " and " + groups[-1]} have been successfully pinged. However, your ping request has caused one or more errors:\n\n""" + error_message], comment.author)
+        if not groups:
+            return
 
         def post_comment() -> praw.models.Comment:
             """posts reply indicating ping was successful"""
-            return comment.reply(f"^(Pinging members of {group} group...)")
+            if len(groups) == 1:
+                return comment.reply(f"^(Pinging members of {groups[0]} group...)")
+            else:
+                return comment.reply(f"""^(Pinging members of {", ".join(groups[:-1]) + " and " + groups[-1]} groups...)""")
+  
+            
 
         def edit_comment(posted: praw.models.Comment) -> None:
             """edits comment to reflect all users pinged"""
-            body: str = "\n\n".join([f"Pinged members of {group} group.",
-                self._footer([("Subscribe to this group", f"Add yourself to group {group}", "addtogroup", f"{group}"),
-                              ("Unsubscribe from this group", f"Unsubscribe from group {group}", "unsubscribe", f"{group}"),
-                              ("Unsubscribe from all groups", f"Unsubscribe from all groups", "unsubscribe", "")])])
+            if len(groups) == 1:
+                body: str = "\n\n".join([f"Pinged members of {groups[0]} group.",
+                    self._footer([("Subscribe to this group", f"Add yourself to group {groups[0]}", "addtogroup", f"{groups[0]}"),
+                                  ("Unsubscribe from this group", f"Unsubscribe from group {groups[0]}", "unsubscribe", f"{groups[0]}"),
+                                  ("Unsubscribe from all groups", f"Unsubscribe from all groups", "unsubscribe", "")])])
+            else:
+                subscribe_buttons: List[Tuple[str, ...]] = []
+                for group in groups:
+                    subscribe_buttons.append((f"Subscribe to group {group}", f"""Add yourself to group {group}""", "addtogroup", f"{group}"))
+                for group in groups:
+                    subscribe_buttons.append((f"Unsubscribe from group {group}", f"""Unsubscribe from group {group}""", "unsubscribe", f"{group}"))
+
+                body: str = "\n\n".join([f"""Pinged members of {", ".join(groups[:-1]) + " and " + groups[-1]} groups.""",
+                    self._footer(subscribe_buttons + 
+                                  [("Unsubscribe from all groups", f"Unsubscribe from all groups", "unsubscribe", "")])])
+
             posted.edit(body)
 
-        self.logger.info("Pinging group \"%s\"", group)
+        self.logger.info("Pinging groups %s", groups)
 
         self.logger.debug("Posting comment")
         try:
@@ -313,11 +373,13 @@ class UserPinger(object):
             if user.lower() == str(comment.author).lower():
                 continue
             try:
-                unsub_group_msg: str = self._command_link(f"^Click ^here ^to ^unsubscribe ^from ^{group}", f"Unsubscribe from group {group}", "unsubscribe", f"{group}")
-                unsub_all_msg: str = self._command_link(f"^Reply ^\"unsubscribe\" ^to ^stop ^receiving ^these ^messages", "Unsubscribe from all groups", "unsubscribe", "")
+                unsub_msg = ""
+                for group in groups:
+                    unsub_msg += self._command_link(f"^Click ^here ^to ^unsubscribe ^from ^{group}", f"Unsubscribe from group {group}", "unsubscribe", f"{group}") + "\n\n"
+                unsub_msg += self._command_link(f"^Reply ^\"unsubscribe\" ^to ^stop ^receiving ^these ^messages", "Unsubscribe from all groups", "unsubscribe", "") + "\n\n"
                 self.reddit.redditor(user).message(
-                    subject=f"You've been pinged by /u/{comment.author} in group {group}",
-                    message=f"[Click here to view the comment](https://www.reddit.com{str(comment.permalink)}?context=1000)\n\n---\n\n{unsub_group_msg}\n\n{unsub_all_msg}"
+                    subject=f"You've been pinged by /u/{comment.author} in group {groups[0]}" if (len(groups) == 1) else f"""You've been pinged by /u/{comment.author} in group {("+".join(groups) if (len(groups) > 1) else groups[0])}""",
+                    message=f"[Click here to view the comment]({str(comment.permalink)}?context=1000)\n\n---\nn" + unsub_msg
                 )
             except praw.exceptions.APIException as ex:
                 self.logger.debug("%s could not be found in group %s", user, group)
@@ -339,7 +401,7 @@ class UserPinger(object):
         edit_comment(posted_comment)
         self.logger.debug("Edited comment")
 
-        self.logger.info("Pinged group \"%s\"", group)
+        self.logger.info("Pinged group \"%s\"", ", ".join(groups[:-1]) + " and " + groups[-1])
         return
 
     def handle_command(self, message: praw.models.Message) -> None:
@@ -415,33 +477,47 @@ class UserPinger(object):
 
             Usage:
             body = addtogroup [group you want to be added to]
+            body = addtogroup [group 1]+[group 2]+...
             """
-            self.logger.info("Adding %s to group \"%s\"", author, body)
+            # "addtogroup DAD+USA-CVILLE" and "addtogroup DAD, USA-CVILLE" and "addtogroup DAD,USA-CVILLE" are equivalent
+            groups_to_add: List[str] = body.replace(", ", "+").replace(",","+").replace(" ","+").split("+")
+
+
+            self.logger.info("Adding %s to group(s) \"%s\"", author, body)
             self.logger.debug("Getting groups")
-            groups: ConfigParser = self._get_wiki_page(["config", "groups"])
+            list_of_all_groups: ConfigParser = self._get_wiki_page(["config", "groups"])
             self.logger.debug("Got groups")
+            
 
-            self.logger.debug("Checking if group exists")
-            if self.group_exists(body, groups) is False:
-                self.logger.warning(f"Add group request {body} by {author} is invalid (does not exist)")
-                self._send_error_pm("Invalid add group request", [f"The group \"{body}\" does not exist"], author)
-                return
-            self.logger.debug("Group exists")
+            error_message: str = ""
+            valid_groups: List[str] = []
+            for group in groups_to_add:
+                self.logger.debug("Checking if group exists or is protected")
+                if self.group_exists(group, list_of_all_groups) is False:
+                    self.logger.debug("Group does not exist")
+                    self.logger.warning(f"Add group request {group} by {author} is invalid (does not exist)")
+                    error_message += f"* The group \"{group}\" does not exist.\n\n"
+                elif self.protected_group(body):
+                    self.logger.debug("Group is protected")
+                    self.logger.warning("%s tried to add themselves to protected group \"%s\"", author, body)
+                    error_message += f"* You attempted to add yourself to protected group {group}.\n\n"
+                else:
+                    self.logger.debug("Group exists and is not protected")
+                    valid_groups.append(group.upper())
+            if error_message:
+                self.logger.warning("Add to group request has invalid argument(s)")
+                self._send_error_pm(f"Cannot add to group", [f"One or more groups do not exist or are protected:\n\n" + error_message], author)
 
-            self.logger.debug("Checking if group is protected")
-            if self.protected_group(body):
-                self.logger.warning("%s tried to add themselves to protected group \"%s\"", author, body)
-                self._send_error_pm("Attempted to add to protected group", [f"You attempted to add yourself to protected group {body}."], author)
-                return
-            self.logger.debug("Group is not protected")
-
-            groups.set(body.upper(), str(author), None)
-            self.logger.info("Added successfully")
-
-            self._send_pm(f"Added to Group {body.upper()}", [f"You were added to group {body.upper()}"], author)
-            # Revision reasons cannot contain emojis. This works around that.
-            revision_reason = body.upper().replace('🔮', '[Crystal Ball]').encode('ascii', 'ignore').decode('utf-8')
-            self._update_wiki_page(["config", "groups"], groups, f"Added /u/{author} to Group {revision_reason}")
+            for group in valid_groups:
+                list_of_all_groups.set(group, str(author), None)
+                self.logger.info("Added successfully")
+                # Revision reasons cannot contain emojis. This works around that.
+                revision_reason = group.replace('🔮', '[Crystal Ball]').encode('ascii', 'ignore').decode('utf-8')
+                self._update_wiki_page(["config", "groups"], list_of_all_groups, f"Added /u/{author} to Group {revision_reason}")
+            if len(valid_groups) == 1:
+                self._send_pm(f"Added to Group {valid_groups[0]}", [f"You were added to group {valid_groups[0]}"], author)
+            if len(valid_groups) > 1:
+                self._send_pm(f"""Added to Groups {", ".join(valid_groups[:-1]) + " and " + valid_groups[-1]}""", [f"""You were added to groups {", ".join(valid_groups[:-1]) + " and " + valid_groups[-1]}"""], author)
             return
 
         def remove_from_group(body: str, author: praw.models.Redditor) -> None:
@@ -450,34 +526,47 @@ class UserPinger(object):
 
             Usage:
             body = removefromgroup [group you want to be removed from]
+            body = removefromgroup [group1]+[group2]+...
             """
-            self.logger.debug("Getting groups")
+            groups_to_add: List[str] = body.replace(", ", "+").replace(",","+").split("+")
+            self.logger.debug(f"Requested to remove groups {groups_to_add}. Getting groups")
             groups: ConfigParser = self._get_wiki_page(["config", "groups"])
             self.logger.debug("Got groups")
 
-            self.logger.debug("Checking if group exists")
-            if self.group_exists(body, groups) is None:
-                self.logger.warning(f"Remove group request {body} by {author} is invalid")
-                self._send_error_pm(f"Group {body} does not exist", [f"You attempted to remove yourself from group {body} which does not exist"], author)
-                return
-            self.logger.debug("Group exists")
-
-            self.logger.debug("Removing %s from group %s", author, body)
+            error_message: str = ""
+            valid_groups: List[str] = []
+            for group in groups_to_add:
+                self.logger.debug("Checking if group exists or is protected")
+                if self.group_exists(group, groups) is False:
+                    self.logger.debug("Group does not exist")
+                    self.logger.warning(f"Add group request {group} by {author} is invalid (does not exist)")
+                    error_message += f"* The group \"{group}\" does not exist.\n\n"
+                else:
+                    valid_groups.append(group)
+            if valid_groups:
+                self.logger.debug("Removing %s from groups %s", author, ("+".join(valid_groups) if (len(valid_groups) > 1) else valid_groups[0]))
             regex = re.compile(str(author), flags=re.IGNORECASE)
-            matches = list(filter(regex.match, groups.options(body.upper())))
-
-            if not matches:
-                self.logger.warning("Remove group request is invalid")
-                self._send_error_pm(f"Cannot remove non-member from {body}", [f"You could not be removed from group {body} because you are not a member"], author)
-            else:
-                for match in matches:
-                    groups.remove_option(body.upper(), match)
+            matches = []
+            for group in valid_groups:
+                matches += list(filter(regex.match, groups.options(group.upper())))
+            if error_message:
+                self.logger.warning("Remove group request has invalid argument(s)")
+                if valid_groups:
+                    self._send_error_pm(f"Userpinger Partial Error: Invalid Group", [f"You could not be removed from one or more groups for the following reason(s):\n\n" + error_message], author)
+                else:
+                    self._send_error_pm(f"Userpinger Error: Invalid Group", [f"You could not be removed from one or more groups for the following reason(s):\n\n" + error_message], author)
+            if valid_groups:
+                for group in valid_groups:
+                    for match in matches:
+                        groups.remove_option(group.upper(), match)
                 self.logger.debug("Removed from group")
-                self._send_pm(f"Removed from Group {body.upper()}", [f"You were removed from group {body.upper()}"], author)
-                # Revision reasons cannot contain emojis. This works around that.
-                revision_reason = body.upper().replace('🔮', '[Crystal Ball]').encode('ascii', 'ignore').decode('utf-8')
+                if len(valid_groups) == 1:
+                    self._send_pm(f"Removed from Group {valid_groups[0].upper()}", [f"You were removed from group {valid_groups[0].upper()}"], author)
+                else:
+                    self._send_pm(f"""Removed from Groups {", ".join(valid_groups[:-1]) + " and " + valid_groups[-1]}""", [f"""You were removed from groups {", ".join(valid_groups[:-1]) + " and " + valid_groups[-1]}"""], author)
+                    # Revision reasons cannot contain emojis. This works around that.
+                revision_reason = group.replace('🔮', '[Crystal Ball]').encode('ascii', 'ignore').decode('utf-8')
                 self._update_wiki_page(["config", "groups"], groups, message=f"Removed /u/{author} from Group {revision_reason}")
-
             return
 
         def unsubscribe(data: str, author: praw.models.Redditor) -> None:
@@ -488,19 +577,29 @@ class UserPinger(object):
             body = unsubscribe [group_name]
             """
             data = data.upper()
-            unsub_groups: List[str] = data.split()
-            self.logger.info(f"Processing unsubscribe {str(author)} from {str(unsub_groups)}")
+
+            
+            if data and (not data.isspace()):
+                self.logger.info(f"Processing unsubscribe {str(author)} from {data}")
+                remove_from_group(data.replace(', ', "+").replace(" ", "+").replace(",", "+"), author)
+                return
+            self.logger.info(f"Processing unsubscribe {str(author)} from all")
             self.logger.debug("Getting groups")
             groups: ConfigParser = self._get_wiki_page(["config", "groups"])
             self.logger.debug("Got groups")
+            groups_to_remove: List[str] = []
             for (group_name, usernames) in groups.items():
                 for username in usernames.items():
                     username = str(username[0]).upper()
-                    if (not unsub_groups or group_name in unsub_groups):
-                        if str(author).upper() == username.upper():
-                            self.logger.info(f"Removing {username} from {group_name}")
-                            remove_from_group(group_name, author)
-                            break # Don't try to remove the same user multiple times
+                    if str(author).upper() == username.upper():
+                        self.logger.info(f"Removing {username} from {group_name}")
+                        groups_to_remove.append(group_name)
+                        break # Don't try to remove the same user multiple times
+            if groups_to_remove:
+                remove_from_group("+".join(groups_to_remove), author)
+            else:
+                self._send_error_pm(f"Invalid Unsubscribe", [f"You were already not a member of any group.\n\n"], author)
+
             return
 
         def list_groups(_, author: praw.models.Redditor) -> None:
