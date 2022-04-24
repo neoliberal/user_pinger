@@ -331,7 +331,7 @@ class UserPinger(object):
                         matches = list(filter(regex.match, groups.options(section)))
                         for match in matches:
                             groups.remove_option(section, match)
-                    self._update_wiki_page(["config", "groups"], groups, message=f"Removed deleted or suspended user /u/{user}")
+                    #self._update_wiki_page(["config", "groups"], groups, message=f"Removed deleted or suspended user /u/{user}")
 
         self.logger.debug("Pinged individual users")
 
