@@ -323,7 +323,7 @@ class UserPinger(object):
                 self.logger.debug("%s could not be found in group %s", user, group)
                 # Check if account is deleted/suspended/misspelled, remove if so
                 error_types = [subexception.error_type for subexception in ex.items]
-                if "USER_DOESNT_EXIST" or "INVALID_USER" in error_types:
+                if "USER_DOESNT_EXIST" in error_types or "INVALID_USER" in error_types:
                     self.logger.debug("Account %s is deleted or suspended, removing them", user)
                     groups: ConfigParser = self._get_wiki_page(["config", "groups"])
                     regex = re.compile(user, flags=re.IGNORECASE)
@@ -331,7 +331,7 @@ class UserPinger(object):
                         matches = list(filter(regex.match, groups.options(section)))
                         for match in matches:
                             groups.remove_option(section, match)
-                    #self._update_wiki_page(["config", "groups"], groups, message=f"Removed deleted or suspended user /u/{user}")
+                    self._update_wiki_page(["config", "groups"], groups, message=f"Removed deleted or suspended user /u/{user}")
 
         self.logger.debug("Pinged individual users")
 
